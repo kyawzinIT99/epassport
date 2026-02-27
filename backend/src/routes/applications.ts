@@ -4,7 +4,7 @@ import { authenticate, AuthRequest } from '../middleware/auth';
 import { upload } from '../middleware/upload';
 import db from '../database/db';
 import { notifyUser, emitToRole, emitToUser } from '../services/sseService';
-import { sendExpressPaymentGuidance } from '../services/aiMessageService';
+import { sendExpressPaymentGuidance, sendStandardWelcomeMessage } from '../services/aiMessageService';
 import { sendSmsToUser } from '../services/smsService';
 
 const router = Router();
@@ -134,11 +134,15 @@ router.post(
       submitted_at: new Date().toISOString(),
     });
 
-    // AI auto-reply: guide non-agent express applicants on how to pay the $50 fee
-    // Fire-and-forget — the response is sent immediately, AI generates in background
-    if (tier === 'express' && !agentId) {
-      sendExpressPaymentGuidance(id, req.user!.id, full_name, applicationNumber)
-        .catch((err) => console.error('[AI Message] express guidance failed:', err.message));
+    // AI auto-reply — fire-and-forget for all non-agent submissions
+    if (!agentId) {
+      if (tier === 'express') {
+        sendExpressPaymentGuidance(id, req.user!.id, full_name, applicationNumber)
+          .catch((err) => console.error('[AI Message] express guidance failed:', err.message));
+      } else {
+        sendStandardWelcomeMessage(id, req.user!.id, full_name, applicationNumber)
+          .catch((err) => console.error('[AI Message] standard welcome failed:', err.message));
+      }
     }
 
     res.status(201).json(application);
