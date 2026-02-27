@@ -150,6 +150,9 @@ export default function AdminDashboard() {
   const [internalNotes, setInternalNotes] = useState('');
   const [internalNotesSaving, setInternalNotesSaving] = useState(false);
 
+  // Document lightbox (admin review panel)
+  const [adminLightboxUrl, setAdminLightboxUrl] = useState<string | null>(null);
+
   // Scheduled Announcements
   const [annOpen, setAnnOpen] = useState(false);
   const [annList, setAnnList] = useState<any[]>([]);
@@ -313,6 +316,13 @@ export default function AdminDashboard() {
     }
     if (tab === 'appointments') fetchAdminAppointments();
   }, [tab]);
+
+  // ESC closes admin lightbox
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setAdminLightboxUrl(null); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Live new-application badge: SSE → Navbar dispatches CustomEvent → we listen here
   useEffect(() => {
@@ -930,28 +940,30 @@ export default function AdminDashboard() {
                         <div>
                           <div className="flex items-center justify-between mb-1.5">
                             <p className="text-xs font-medium text-gray-600">Passport Photo</p>
-                            <a
-                              href={`/uploads/${selected.photo_path}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs font-medium hover:underline"
-                              style={{ color: '#1a2744' }}
-                            >
+                            <a href={`/uploads/${selected.photo_path}`} target="_blank" rel="noreferrer"
+                              className="text-xs font-medium hover:underline" style={{ color: '#1a2744' }}>
                               Open ↗
                             </a>
                           </div>
-                          <img
-                            src={`/uploads/${selected.photo_path}`}
-                            alt="Passport photo"
-                            className="w-full rounded-xl border border-gray-200 bg-gray-100"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
-                              (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                            }}
-                          />
+                          <button
+                            onClick={() => setAdminLightboxUrl(`/uploads/${selected.photo_path}`)}
+                            className="group relative w-full focus:outline-none"
+                          >
+                            <img
+                              src={`/uploads/${selected.photo_path}`}
+                              alt="Passport photo"
+                              className="w-full rounded-xl border border-gray-200 bg-gray-100 group-hover:opacity-90 transition"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).style.display = 'none';
+                                (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                            <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 group-hover:bg-black/35 transition pointer-events-none">
+                              <span className="text-white text-xs font-bold opacity-0 group-hover:opacity-100 transition drop-shadow">🔍 Click to expand</span>
+                            </div>
+                          </button>
                           <p className="hidden text-xs text-red-400 mt-1">
-                            Image failed to load —{' '}
-                            <a href={`/uploads/${selected.photo_path}`} target="_blank" rel="noreferrer" className="underline">open directly</a>
+                            Image failed to load — <a href={`/uploads/${selected.photo_path}`} target="_blank" rel="noreferrer" className="underline">open directly</a>
                           </p>
                         </div>
                       ) : (
@@ -962,40 +974,38 @@ export default function AdminDashboard() {
                         <div>
                           <div className="flex items-center justify-between mb-1.5">
                             <p className="text-xs font-medium text-gray-600">ID Document</p>
-                            <a
-                              href={`/uploads/${selected.id_document_path}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs font-medium hover:underline"
-                              style={{ color: '#1a2744' }}
-                            >
+                            <a href={`/uploads/${selected.id_document_path}`} target="_blank" rel="noreferrer"
+                              className="text-xs font-medium hover:underline" style={{ color: '#1a2744' }}>
                               Open ↗
                             </a>
                           </div>
                           {selected.id_document_path.endsWith('.pdf') ? (
-                            <a
-                              href={`/uploads/${selected.id_document_path}`}
-                              target="_blank"
-                              rel="noreferrer"
+                            <a href={`/uploads/${selected.id_document_path}`} target="_blank" rel="noreferrer"
                               className="flex items-center gap-2 text-xs font-medium p-3 bg-blue-50 rounded-xl border border-blue-100 hover:bg-blue-100 transition"
-                              style={{ color: '#1a2744' }}
-                            >
-                              📄 View PDF Document
+                              style={{ color: '#1a2744' }}>
+                              📄 View PDF Document ↗
                             </a>
                           ) : (
                             <>
-                              <img
-                                src={`/uploads/${selected.id_document_path}`}
-                                alt="ID document"
-                                className="w-full rounded-xl border border-gray-200 bg-gray-100"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = 'none';
-                                  (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
-                                }}
-                              />
+                              <button
+                                onClick={() => setAdminLightboxUrl(`/uploads/${selected.id_document_path}`)}
+                                className="group relative w-full focus:outline-none"
+                              >
+                                <img
+                                  src={`/uploads/${selected.id_document_path}`}
+                                  alt="ID document"
+                                  className="w-full rounded-xl border border-gray-200 bg-gray-100 group-hover:opacity-90 transition"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = 'none';
+                                    (e.target as HTMLImageElement).nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                                <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 group-hover:bg-black/35 transition pointer-events-none">
+                                  <span className="text-white text-xs font-bold opacity-0 group-hover:opacity-100 transition drop-shadow">🔍 Click to expand</span>
+                                </div>
+                              </button>
                               <p className="hidden text-xs text-red-400 mt-1">
-                                Image failed —{' '}
-                                <a href={`/uploads/${selected.id_document_path}`} target="_blank" rel="noreferrer" className="underline">open directly</a>
+                                Image failed — <a href={`/uploads/${selected.id_document_path}`} target="_blank" rel="noreferrer" className="underline">open directly</a>
                               </p>
                             </>
                           )}
@@ -2927,6 +2937,29 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+      {/* ── Admin Document Lightbox ─────────────────────────────────────── */}
+      {adminLightboxUrl && (
+        <div
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ zIndex: 9999, background: 'rgba(0,0,0,0.88)' }}
+          onClick={() => setAdminLightboxUrl(null)}
+        >
+          <button
+            onClick={() => setAdminLightboxUrl(null)}
+            className="absolute top-4 right-5 text-white text-4xl leading-none font-light hover:text-gray-300 transition"
+            style={{ zIndex: 10000 }}
+          >
+            ×
+          </button>
+          <img
+            src={adminLightboxUrl}
+            alt="Document full view"
+            className="max-w-full max-h-[90vh] rounded-2xl shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       <Footer />
     </div>
   );
