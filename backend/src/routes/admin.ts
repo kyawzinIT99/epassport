@@ -389,15 +389,30 @@ router.delete('/users/:id', authenticate, requireAdmin, (req: AuthRequest, res: 
   if (!target) { res.status(404).json({ message: 'User not found' }); return; }
   if (req.params.id === req.user!.id) { res.status(400).json({ message: 'You cannot delete your own account.' }); return; }
   if (target.is_super_admin === 1) { res.status(403).json({ message: 'Super Admin accounts cannot be deleted.' }); return; }
-  logAudit(req.user!.id, getAdminName(req.user!.id), 'delete_user', 'user', req.params.id,
-    `Deleted user ${target.full_name} (${target.email})`);
-  db.prepare('DELETE FROM notifications WHERE user_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM application_history WHERE application_id IN (SELECT id FROM applications WHERE user_id = ?)').run(req.params.id);
-  db.prepare('DELETE FROM applications WHERE user_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(req.params.id);
-  db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
-  res.json({ message: 'User and all associated data deleted' });
+
+  try {
+    logAudit(req.user!.id, getAdminName(req.user!.id), 'delete_user', 'user', req.params.id,
+      `Deleted user ${target.full_name} (${target.email})`);
+
+    // Delete in dependency order so FK references don't block
+    db.prepare('DELETE FROM messages WHERE application_id IN (SELECT id FROM applications WHERE user_id = ?)').run(req.params.id);
+    db.prepare('DELETE FROM messages WHERE sender_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM csat_surveys WHERE application_id IN (SELECT id FROM applications WHERE user_id = ?)').run(req.params.id);
+    db.prepare('DELETE FROM csat_surveys WHERE user_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM passport_expiry_reminders WHERE application_id IN (SELECT id FROM applications WHERE user_id = ?)').run(req.params.id);
+    db.prepare('DELETE FROM application_history WHERE application_id IN (SELECT id FROM applications WHERE user_id = ?)').run(req.params.id);
+    db.prepare('DELETE FROM notifications WHERE user_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM applications WHERE user_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM email_verification_tokens WHERE user_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM password_reset_tokens WHERE user_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM login_logs WHERE user_id = ?').run(req.params.id);
+    db.prepare('DELETE FROM users WHERE id = ?').run(req.params.id);
+
+    res.json({ message: 'User and all associated data deleted' });
+  } catch (err: any) {
+    console.error('[Delete User] Error:', err.message);
+    res.status(500).json({ message: `Delete failed: ${err.message}` });
+  }
 });
 
 // Toggle super-admin status (super admin only)
