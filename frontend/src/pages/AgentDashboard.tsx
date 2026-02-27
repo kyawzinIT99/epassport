@@ -1,8 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
 import { Application, User } from '../types';
+
+const APPT_SUBJECTS = [
+  'Payment Query', 'Document Submission', 'Application Status Review',
+  'Express Upgrade Request', 'Passport Collection', 'Document Correction',
+  'Urgent Processing', 'Other',
+];
+
+const apptStatusCfg: Record<string, { label: string; bg: string; text: string; icon: string }> = {
+  pending:   { label: 'Pending',   bg: 'bg-amber-50 border-amber-200',    text: 'text-amber-700',   icon: '⏳' },
+  approved:  { label: 'Approved',  bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700', icon: '✅' },
+  rejected:  { label: 'Rejected',  bg: 'bg-red-50 border-red-200',        text: 'text-red-700',     icon: '❌' },
+  completed: { label: 'Completed', bg: 'bg-gray-50 border-gray-200',       text: 'text-gray-600',    icon: '☑️' },
+};
 
 const statusConfig: Record<string, { label: string; bg: string; text: string; dot: string; icon: string }> = {
   pending: {
@@ -43,12 +56,57 @@ export default function AgentDashboard() {
   const userStr = sessionStorage.getItem('user');
   const user: User = userStr ? JSON.parse(userStr) : null;
 
+  // Appointment state
+  const [appointments, setAppointments] = useState<any[]>([]);
+  const [showApptModal, setShowApptModal] = useState(false);
+  const [apptSubject, setApptSubject] = useState(APPT_SUBJECTS[0]);
+  const [apptDesc, setApptDesc] = useState('');
+  const [apptAppId, setApptAppId] = useState('');
+  const [apptLoading, setApptLoading] = useState(false);
+  const [apptError, setApptError] = useState('');
+
+  const fetchAppointments = () =>
+    api.get('/appointments').then(({ data }) => setAppointments(data)).catch(() => {});
+
   useEffect(() => {
     api.get('/applications').then(({ data }) => {
       setApplications(data);
       setLoading(false);
     });
+    fetchAppointments();
   }, []);
+
+  const handleApptSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setApptError('');
+    setApptLoading(true);
+    try {
+      await api.post('/appointments', {
+        subject: apptSubject,
+        description: apptDesc,
+        application_id: apptAppId || undefined,
+      });
+      setShowApptModal(false);
+      setApptDesc('');
+      setApptSubject(APPT_SUBJECTS[0]);
+      setApptAppId('');
+      fetchAppointments();
+    } catch (err: any) {
+      setApptError(err.response?.data?.message || 'Failed to submit request');
+    } finally {
+      setApptLoading(false);
+    }
+  };
+
+  const cancelAppt = async (id: string) => {
+    if (!confirm('Cancel this appointment request?')) return;
+    try {
+      await api.delete(`/appointments/${id}`);
+      fetchAppointments();
+    } catch (err: any) {
+      alert(err.response?.data?.message || 'Could not cancel');
+    }
+  };
 
   const markPaid = async (appId: string) => {
     setPayLoading(true);
@@ -64,7 +122,6 @@ export default function AgentDashboard() {
   };
 
   const approved = applications.filter((a) => a.status === 'approved').length;
-  const pending = applications.filter((a) => a.status === 'pending').length;
   const processing = applications.filter((a) => a.status === 'processing').length;
   const active = applications.filter((a) => ['pending', 'processing'].includes(a.status)).length;
   const pendingPayments = applications.filter(
@@ -110,6 +167,12 @@ export default function AgentDashboard() {
               <p className="text-blue-200 text-sm mt-0.5">Submit and manage client passport applications</p>
             </div>
             <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowApptModal(true)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all border border-white/20 text-white hover:bg-white/10 active:scale-[0.97]"
+              >
+                📅 Appointment
+              </button>
               {/* Agents can always submit new applications for clients */}
               <Link
                 to="/apply"
@@ -357,6 +420,152 @@ export default function AgentDashboard() {
           </div>
         )}
       </div>
+
+      {/* ── Appointments section ─────────────────────────────────────────── */}
+      {appointments.length > 0 && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-10">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">
+            My Appointments ({appointments.length})
+          </p>
+          <div className="space-y-3">
+            {appointments.map((appt) => {
+              const cfg = apptStatusCfg[appt.status] || apptStatusCfg.pending;
+              return (
+                <div
+                  key={appt.id}
+                  className="bg-white rounded-2xl shadow-card border border-gray-100 overflow-hidden flex"
+                >
+                  <div
+                    className="w-1.5 flex-shrink-0 rounded-l-2xl"
+                    style={{
+                      background: appt.status === 'approved' ? 'linear-gradient(180deg,#34d399,#10b981)'
+                        : appt.status === 'rejected'  ? 'linear-gradient(180deg,#f87171,#ef4444)'
+                        : appt.status === 'completed' ? 'linear-gradient(180deg,#94a3b8,#64748b)'
+                        : 'linear-gradient(180deg,#fbbf24,#f59e0b)',
+                    }}
+                  />
+                  <div className="flex-1 p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-bold text-gray-800 truncate">{appt.subject}</p>
+                        {appt.description && (
+                          <p className="text-sm text-gray-500 mt-0.5 line-clamp-2">{appt.description}</p>
+                        )}
+                        {appt.status === 'approved' && appt.scheduled_date && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                              📅 {appt.scheduled_date}{appt.scheduled_time ? ` · ${appt.scheduled_time}` : ''}
+                            </span>
+                            {appt.location && (
+                              <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg">
+                                📍 {appt.location}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                        {appt.admin_notes && (
+                          <p className="text-xs text-gray-500 mt-1.5 italic">Note: {appt.admin_notes}</p>
+                        )}
+                        <p className="text-xs text-gray-400 mt-1">
+                          Requested {new Date(appt.requested_at).toLocaleDateString()}
+                          {appt.arranged_by_name && ` · Arranged by ${appt.arranged_by_name}`}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-2 flex-shrink-0">
+                        <span className={`inline-flex items-center gap-1 text-xs font-bold px-3 py-1 rounded-full border ${cfg.bg} ${cfg.text}`}>
+                          {cfg.icon} {cfg.label}
+                        </span>
+                        {appt.status === 'pending' && (
+                          <button
+                            onClick={() => cancelAppt(appt.id)}
+                            className="text-xs text-red-500 hover:text-red-700 font-medium transition"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Request Appointment Modal ──────────────────────────────────────── */}
+      {showApptModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
+            <div
+              className="px-6 py-5"
+              style={{ background: 'linear-gradient(135deg, #0f1b3a, #1a2744)' }}
+            >
+              <h2 className="text-white font-bold text-lg">📅 Request Appointment</h2>
+              <p className="text-blue-300 text-xs mt-0.5">Submit a request — an admin will arrange a time for you</p>
+            </div>
+            <form onSubmit={handleApptSubmit} className="p-6 space-y-4">
+              {apptError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 text-sm">{apptError}</div>
+              )}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Subject</label>
+                <select
+                  value={apptSubject}
+                  onChange={(e) => setApptSubject(e.target.value)}
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition"
+                >
+                  {APPT_SUBJECTS.map((s) => <option key={s}>{s}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">Details <span className="text-gray-400 font-normal">(optional)</span></label>
+                <textarea
+                  rows={3}
+                  value={apptDesc}
+                  onChange={(e) => setApptDesc(e.target.value)}
+                  placeholder="Briefly describe your issue or what you need help with..."
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition"
+                />
+              </div>
+              {applications.filter((a) => ['pending', 'processing'].includes(a.status)).length > 0 && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">Link to Client Application <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <select
+                    value={apptAppId}
+                    onChange={(e) => setApptAppId(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition"
+                  >
+                    <option value="">— None —</option>
+                    {applications
+                      .filter((a) => ['pending', 'processing'].includes(a.status))
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>{a.application_number} — {a.full_name}</option>
+                      ))}
+                  </select>
+                </div>
+              )}
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowApptModal(false)}
+                  className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-50 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={apptLoading}
+                  className="flex-1 text-white py-2.5 rounded-xl font-semibold text-sm transition disabled:opacity-60"
+                  style={{ background: 'linear-gradient(135deg, #c9a227, #f0c84a)', color: '#0f1b3a' }}
+                >
+                  {apptLoading ? 'Submitting…' : 'Submit Request'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Cash Payment Confirmation Modal */}
       {payingId && (
