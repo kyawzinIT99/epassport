@@ -219,7 +219,7 @@ export async function runExpressPaymentRevert(): Promise<void> {
 
   for (const app of unpaid) {
     db.prepare(`
-      UPDATE applications SET processing_tier = 'standard', tier_price = 0, payment_status = NULL WHERE id = ?
+      UPDATE applications SET processing_tier = 'standard', tier_price = 0, payment_status = 'paid' WHERE id = ?
     `).run(app.id);
 
     db.prepare(`

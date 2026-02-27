@@ -744,7 +744,7 @@ router.patch('/applications/:id/tier', authenticate, requireAdmin, (req: AuthReq
   }
 
   const tierPrice     = tier === 'express' ? 50 : 0;
-  const paymentStatus = tier === 'express' ? 'pending' : null;
+  const paymentStatus = tier === 'express' ? 'pending' : 'paid';
   db.prepare(`
     UPDATE applications SET processing_tier = ?, tier_price = ?, payment_status = ? WHERE id = ?
   `).run(tier, tierPrice, paymentStatus, app.id);
