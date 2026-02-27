@@ -724,4 +724,40 @@ router.patch('/applications/:id/internal-notes', authenticate, requireAdmin, (re
   res.json({ success: true });
 });
 
+// ── Scheduled Announcements ───────────────────────────────────────────────────
+router.get('/announcements', authenticate, requireAdmin, (_req: AuthRequest, res: Response): void => {
+  const list = db.prepare('SELECT * FROM announcements ORDER BY scheduled_at DESC').all();
+  res.json(list);
+});
+
+router.post('/announcements', authenticate, requireAdmin, (req: AuthRequest, res: Response): void => {
+  const { title, message, filter_status, filter_tier, scheduled_at } = req.body;
+  if (!title?.trim() || !message?.trim() || !scheduled_at) {
+    res.status(400).json({ message: 'Title, message and scheduled time are required' }); return;
+  }
+  const admin = db.prepare('SELECT full_name FROM users WHERE id = ?').get(req.user!.id) as any;
+  const id = uuidv4();
+  db.prepare(`
+    INSERT INTO announcements (id, title, message, filter_status, filter_tier, scheduled_at, created_by, created_by_name)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id, title.trim(), message.trim(),
+    filter_status || 'all', filter_tier || 'all',
+    scheduled_at,
+    req.user!.id, admin?.full_name || req.user!.email
+  );
+  logAudit(req.user!.id, admin?.full_name || req.user!.email, 'create_announcement', 'announcement', id, `Scheduled "${title.trim()}" for ${scheduled_at}`);
+  res.status(201).json(db.prepare('SELECT * FROM announcements WHERE id = ?').get(id));
+});
+
+router.delete('/announcements/:id', authenticate, requireAdmin, (req: AuthRequest, res: Response): void => {
+  const ann = db.prepare('SELECT * FROM announcements WHERE id = ?').get(req.params.id) as any;
+  if (!ann) { res.status(404).json({ message: 'Not found' }); return; }
+  if (ann.sent_at) { res.status(400).json({ message: 'Cannot delete an already-sent announcement' }); return; }
+  const admin = db.prepare('SELECT full_name FROM users WHERE id = ?').get(req.user!.id) as any;
+  db.prepare('DELETE FROM announcements WHERE id = ?').run(req.params.id);
+  logAudit(req.user!.id, admin?.full_name || req.user!.email, 'delete_announcement', 'announcement', req.params.id, `Cancelled "${ann.title}"`);
+  res.json({ success: true });
+});
+
 export default router;

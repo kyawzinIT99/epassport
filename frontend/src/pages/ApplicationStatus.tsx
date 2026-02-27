@@ -223,6 +223,9 @@ export default function ApplicationStatus() {
     existing_passport_number: '',
   });
 
+  // Lightbox state
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
+
   // Queue position state
   const [queuePos, setQueuePos] = useState<{ position: number | null; total: number | null; tier: string } | null>(null);
 
@@ -344,6 +347,13 @@ export default function ApplicationStatus() {
     window.addEventListener('app:new_message', handler);
     return () => window.removeEventListener('app:new_message', handler);
   }, [id]);
+
+  // ESC key closes lightbox
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setLightboxUrl(null); };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   // Auto-scroll support chat to bottom when messages change
   useEffect(() => {
@@ -753,6 +763,61 @@ export default function ApplicationStatus() {
                   );
                 })}
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Uploaded Documents — thumbnail preview */}
+        {((application as any).photo_path || (application as any).id_document_path) && (
+          <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-6 mb-6 no-print">
+            <h3 className="font-bold mb-4" style={{ color: '#1a2744' }}>Uploaded Documents</h3>
+            <div className="flex gap-5">
+              {(application as any).photo_path && (
+                <button
+                  onClick={() => setLightboxUrl(`/uploads/${(application as any).photo_path}`)}
+                  className="group relative flex-shrink-0 focus:outline-none"
+                >
+                  <img
+                    src={`/uploads/${(application as any).photo_path}`}
+                    alt="Passport photo"
+                    className="w-24 h-28 object-cover rounded-xl border-2 border-gray-200 group-hover:border-yellow-400 transition shadow-sm"
+                  />
+                  <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 group-hover:bg-black/40 transition">
+                    <span className="text-white text-xs font-bold opacity-0 group-hover:opacity-100 transition drop-shadow">🔍 View</span>
+                  </div>
+                  <p className="text-xs text-gray-400 text-center mt-1.5 font-medium">Photo</p>
+                </button>
+              )}
+              {(application as any).id_document_path && (
+                /\.(jpg|jpeg|png)$/i.test((application as any).id_document_path) ? (
+                  <button
+                    onClick={() => setLightboxUrl(`/uploads/${(application as any).id_document_path}`)}
+                    className="group relative flex-shrink-0 focus:outline-none"
+                  >
+                    <img
+                      src={`/uploads/${(application as any).id_document_path}`}
+                      alt="ID document"
+                      className="w-24 h-28 object-cover rounded-xl border-2 border-gray-200 group-hover:border-yellow-400 transition shadow-sm"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/0 group-hover:bg-black/40 transition">
+                      <span className="text-white text-xs font-bold opacity-0 group-hover:opacity-100 transition drop-shadow">🔍 View</span>
+                    </div>
+                    <p className="text-xs text-gray-400 text-center mt-1.5 font-medium">ID Document</p>
+                  </button>
+                ) : (
+                  <a
+                    href={`/uploads/${(application as any).id_document_path}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="flex flex-col items-center gap-1 group"
+                  >
+                    <div className="w-24 h-28 bg-red-50 border-2 border-red-100 group-hover:border-yellow-400 rounded-xl flex items-center justify-center transition shadow-sm">
+                      <span className="text-4xl">📄</span>
+                    </div>
+                    <p className="text-xs text-gray-400 font-medium group-hover:text-blue-600 transition mt-0.5">ID Doc (PDF) ↗</p>
+                  </a>
+                )
+              )}
             </div>
           </div>
         )}
@@ -1238,6 +1303,29 @@ export default function ApplicationStatus() {
           </div>
         </div>
       )}
+      {/* Lightbox */}
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ zIndex: 9999, background: 'rgba(0,0,0,0.88)' }}
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute top-4 right-5 text-white text-4xl leading-none font-light hover:text-gray-300 transition"
+            style={{ zIndex: 10000 }}
+          >
+            ×
+          </button>
+          <img
+            src={lightboxUrl}
+            alt="Document full view"
+            className="max-w-full max-h-[90vh] rounded-2xl shadow-2xl object-contain"
+            onClick={(e) => e.stopPropagation()}
+          />
+        </div>
+      )}
+
       {/* Document re-upload modal */}
       {showDocUpload && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>

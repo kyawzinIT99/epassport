@@ -197,6 +197,58 @@ export async function runSlaCheck(): Promise<void> {
   }
 }
 
+// ── Scheduled Announcement delivery ───────────────────────────────────────────
+export async function runAnnouncementDelivery(): Promise<void> {
+  const due = db.prepare(`
+    SELECT * FROM announcements
+    WHERE sent_at IS NULL AND scheduled_at <= datetime('now')
+  `).all() as any[];
+
+  for (const ann of due) {
+    let query: string;
+    const params: any[] = [];
+
+    if (ann.filter_status === 'all' && ann.filter_tier === 'all') {
+      query = "SELECT id, email, full_name FROM users WHERE role IN ('applicant', 'agent') AND suspended = 0";
+    } else {
+      query = `
+        SELECT DISTINCT u.id, u.email, u.full_name
+        FROM users u
+        JOIN applications a ON a.user_id = u.id
+        WHERE u.role IN ('applicant', 'agent') AND u.suspended = 0
+      `;
+      if (ann.filter_status !== 'all') { query += ' AND a.status = ?';          params.push(ann.filter_status); }
+      if (ann.filter_tier   !== 'all') { query += ' AND a.processing_tier = ?'; params.push(ann.filter_tier); }
+    }
+
+    const recipients = db.prepare(query).all(...params) as any[];
+
+    for (const user of recipients) {
+      notifyUser(user.id, `📢 ${ann.title}: ${ann.message}`, 'info');
+      sendEmail(
+        user.email,
+        `📢 ${ann.title}`,
+        `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f0f4ff;padding:32px;">
+          <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+            <div style="background:linear-gradient(135deg,#0f1b3a,#1a2744);padding:24px 28px;">
+              <h1 style="color:#fff;margin:0;font-size:20px;">📢 ${ann.title}</h1>
+              <p style="color:#93c5fd;margin:4px 0 0;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Official Announcement</p>
+            </div>
+            <div style="padding:28px;">
+              <p style="color:#374151;">Dear <strong>${user.full_name}</strong>,</p>
+              <p style="color:#6b7280;line-height:1.7;">${ann.message}</p>
+            </div>
+          </div>
+        </body></html>`
+      ).catch(console.error);
+    }
+
+    db.prepare('UPDATE announcements SET sent_at = CURRENT_TIMESTAMP, recipient_count = ? WHERE id = ?')
+      .run(recipients.length, ann.id);
+    console.log(`[Announcements] Delivered "${ann.title}" to ${recipients.length} recipients.`);
+  }
+}
+
 export function startAutoExpireJob(): void {
   const expireDays = parseInt(process.env.AUTO_EXPIRE_DAYS || '30');
   if (expireDays <= 0) {
@@ -216,6 +268,7 @@ export function startAutoExpireJob(): void {
   }
 
   runSlaCheck();
+  runAnnouncementDelivery();
 
   setInterval(() => {
     runAutoExpire();
@@ -223,4 +276,9 @@ export function startAutoExpireJob(): void {
     runDataRetention();
     runSlaCheck();
   }, 60 * 60 * 1000); // every hour
+
+  // Announcements checked every 5 minutes for timely delivery
+  setInterval(() => {
+    runAnnouncementDelivery();
+  }, 5 * 60 * 1000);
 }

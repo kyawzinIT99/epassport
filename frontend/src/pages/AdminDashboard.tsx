@@ -150,6 +150,21 @@ export default function AdminDashboard() {
   const [internalNotes, setInternalNotes] = useState('');
   const [internalNotesSaving, setInternalNotesSaving] = useState(false);
 
+  // Scheduled Announcements
+  const [annOpen, setAnnOpen] = useState(false);
+  const [annList, setAnnList] = useState<any[]>([]);
+  const [annTab, setAnnTab] = useState<'compose' | 'history'>('compose');
+  const [annTitle, setAnnTitle] = useState('');
+  const [annMessage, setAnnMessage] = useState('');
+  const [annScheduledAt, setAnnScheduledAt] = useState('');
+  const [annFilterStatus, setAnnFilterStatus] = useState('all');
+  const [annFilterTier, setAnnFilterTier] = useState('all');
+  const [annLoading, setAnnLoading] = useState(false);
+  const [annSuccess, setAnnSuccess] = useState(false);
+
+  const fetchAnnouncements = () =>
+    api.get('/admin/announcements').then(({ data }) => setAnnList(data)).catch(() => {});
+
   // SLA thresholds (must match backend .env)
   const SLA_STANDARD_DAYS = 15;
   const SLA_EXPRESS_DAYS = 3;
@@ -629,6 +644,16 @@ export default function AdminDashboard() {
                     Clear filters
                   </button>
                 )}
+                <button
+                  onClick={() => { setAnnOpen(true); setAnnTab('compose'); setAnnSuccess(false); fetchAnnouncements(); }}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition"
+                  title="Schedule an announcement"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Schedule
+                </button>
                 <button
                   onClick={() => { setBroadcastOpen(true); setBroadcastResult(null); }}
                   className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition"
@@ -2503,6 +2528,196 @@ export default function AdminDashboard() {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Scheduled Announcements Modal ─────────────────────────────────── */}
+      {annOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden animate-slide-up">
+            {/* Header */}
+            <div className="px-6 py-5 flex items-center justify-between" style={{ background: 'linear-gradient(135deg, #0f1b3a, #1a2744)' }}>
+              <div>
+                <h2 className="text-white font-bold text-lg">📅 Scheduled Announcements</h2>
+                <p className="text-blue-300 text-xs mt-0.5">Compose a message and choose when it goes out</p>
+              </div>
+              <button onClick={() => setAnnOpen(false)} className="text-blue-300 hover:text-white text-2xl leading-none transition">×</button>
+            </div>
+
+            {/* Tabs */}
+            <div className="flex border-b border-gray-100">
+              {(['compose', 'history'] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => { setAnnTab(t); if (t === 'history') fetchAnnouncements(); }}
+                  className={`flex-1 py-3 text-sm font-semibold transition capitalize ${
+                    annTab === t
+                      ? 'border-b-2 border-yellow-400 text-gray-800'
+                      : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  {t === 'compose' ? '✏️ Compose' : '📋 History'}
+                </button>
+              ))}
+            </div>
+
+            {/* Compose tab */}
+            {annTab === 'compose' && (
+              <div className="p-6 space-y-4">
+                {annSuccess && (
+                  <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-3 text-sm font-semibold text-center">
+                    ✅ Announcement scheduled successfully!
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Title</label>
+                  <input
+                    type="text"
+                    value={annTitle}
+                    onChange={(e) => setAnnTitle(e.target.value)}
+                    placeholder="e.g. System Maintenance Notice"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Message</label>
+                  <textarea
+                    rows={4}
+                    value={annMessage}
+                    onChange={(e) => setAnnMessage(e.target.value)}
+                    placeholder="The full announcement text shown to recipients..."
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Send At</label>
+                  <input
+                    type="datetime-local"
+                    value={annScheduledAt}
+                    onChange={(e) => setAnnScheduledAt(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition"
+                  />
+                  <p className="text-xs text-gray-400 mt-1">Delivered within 5 minutes of the scheduled time.</p>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Filter by Status</label>
+                    <select
+                      value={annFilterStatus}
+                      onChange={(e) => setAnnFilterStatus(e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 transition"
+                    >
+                      <option value="all">All Applicants</option>
+                      <option value="pending">Pending only</option>
+                      <option value="processing">Processing only</option>
+                      <option value="approved">Approved only</option>
+                      <option value="rejected">Rejected only</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-600 mb-1.5">Filter by Tier</label>
+                    <select
+                      value={annFilterTier}
+                      onChange={(e) => setAnnFilterTier(e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 transition"
+                    >
+                      <option value="all">All Tiers</option>
+                      <option value="standard">Standard only</option>
+                      <option value="express">Express only</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="flex gap-3 pt-1">
+                  <button
+                    onClick={() => setAnnOpen(false)}
+                    className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-50 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    disabled={annLoading || !annTitle.trim() || !annMessage.trim() || !annScheduledAt}
+                    onClick={async () => {
+                      setAnnLoading(true);
+                      setAnnSuccess(false);
+                      try {
+                        await api.post('/admin/announcements', {
+                          title: annTitle,
+                          message: annMessage,
+                          scheduled_at: new Date(annScheduledAt).toISOString().replace('T', ' ').slice(0, 19),
+                          filter_status: annFilterStatus,
+                          filter_tier: annFilterTier,
+                        });
+                        setAnnTitle('');
+                        setAnnMessage('');
+                        setAnnScheduledAt('');
+                        setAnnFilterStatus('all');
+                        setAnnFilterTier('all');
+                        setAnnSuccess(true);
+                        fetchAnnouncements();
+                      } catch { /* silent */ } finally {
+                        setAnnLoading(false);
+                      }
+                    }}
+                    className="flex-1 text-white py-2.5 rounded-xl font-semibold text-sm transition disabled:opacity-60 flex items-center justify-center gap-2"
+                    style={{ background: 'linear-gradient(135deg, #1a2744, #243660)' }}
+                  >
+                    {annLoading ? (
+                      <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>Scheduling…</>
+                    ) : '📅 Schedule Announcement'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* History tab */}
+            {annTab === 'history' && (
+              <div className="p-6 max-h-[460px] overflow-y-auto space-y-3">
+                {annList.length === 0 ? (
+                  <p className="text-center text-gray-400 text-sm py-8">No announcements yet.</p>
+                ) : annList.map((ann) => (
+                  <div
+                    key={ann.id}
+                    className={`rounded-xl border p-4 ${ann.sent_at ? 'bg-gray-50 border-gray-200' : 'bg-blue-50 border-blue-200'}`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap mb-1">
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${ann.sent_at ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+                            {ann.sent_at ? '✅ Sent' : '⏳ Pending'}
+                          </span>
+                          {ann.filter_status !== 'all' && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 capitalize">{ann.filter_status}</span>
+                          )}
+                          {ann.filter_tier !== 'all' && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 capitalize">{ann.filter_tier}</span>
+                          )}
+                        </div>
+                        <p className="font-semibold text-gray-800 text-sm truncate">{ann.title}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{ann.message}</p>
+                        <p className="text-xs text-gray-400 mt-1.5">
+                          {ann.sent_at
+                            ? `Delivered ${new Date(ann.sent_at).toLocaleString()} · ${ann.recipient_count} recipient(s)`
+                            : `Scheduled: ${new Date(ann.scheduled_at).toLocaleString()}`}
+                        </p>
+                      </div>
+                      {!ann.sent_at && (
+                        <button
+                          onClick={async () => {
+                            if (!confirm('Cancel this announcement?')) return;
+                            await api.delete(`/admin/announcements/${ann.id}`).catch(() => {});
+                            fetchAnnouncements();
+                          }}
+                          className="text-red-400 hover:text-red-600 text-xs font-semibold flex-shrink-0 transition"
+                        >
+                          Cancel
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
