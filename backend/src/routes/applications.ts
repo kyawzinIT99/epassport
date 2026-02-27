@@ -431,6 +431,41 @@ router.post('/:id/csat', authenticate, (req: AuthRequest, res: Response): void =
   res.status(201).json({ message: 'Thank you for your feedback!' });
 });
 
+// ── Self-service tier downgrade (express → standard) ─────────────────────────
+router.patch('/:id/downgrade-tier', authenticate, (req: AuthRequest, res: Response): void => {
+  const app = db.prepare('SELECT * FROM applications WHERE id = ?').get(req.params.id) as any;
+  if (!app) { res.status(404).json({ message: 'Not found' }); return; }
+  if (app.user_id !== req.user!.id) { res.status(403).json({ message: 'Access denied' }); return; }
+  if (app.status !== 'pending') {
+    res.status(400).json({ message: 'Tier can only be changed on pending applications' }); return;
+  }
+  if (app.processing_tier !== 'express') {
+    res.status(400).json({ message: 'Application is already on standard tier' }); return;
+  }
+  if (app.payment_status === 'paid') {
+    res.status(400).json({ message: 'Cannot downgrade after express payment has been recorded' }); return;
+  }
+
+  db.prepare(`
+    UPDATE applications SET processing_tier = 'standard', tier_price = 0, payment_status = NULL WHERE id = ?
+  `).run(app.id);
+
+  db.prepare(`
+    INSERT INTO application_history (id, application_id, status, admin_notes, changed_by, changed_by_name)
+    VALUES (?, ?, 'pending', 'Applicant switched from Express to Standard processing (fee waived)', ?, 'Applicant')
+  `).run(uuidv4(), app.id, req.user!.id);
+
+  if (app.assigned_to) {
+    notifyUser(app.assigned_to, `Applicant switched ${app.application_number} from Express → Standard tier.`, 'info', app.id);
+  } else {
+    const admins = db.prepare("SELECT id FROM users WHERE role = 'admin' AND suspended = 0").all() as any[];
+    for (const admin of admins) notifyUser(admin.id, `Applicant switched ${app.application_number} from Express → Standard tier.`, 'info', app.id);
+  }
+
+  const updated = db.prepare('SELECT * FROM applications WHERE id = ?').get(app.id);
+  res.json(updated);
+});
+
 // ── Queue position ─────────────────────────────────────────────────────────────
 router.get('/:id/queue-position', authenticate, (req: AuthRequest, res: Response): void => {
   const app = db.prepare(

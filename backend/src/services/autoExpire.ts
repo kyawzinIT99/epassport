@@ -197,6 +197,76 @@ export async function runSlaCheck(): Promise<void> {
   }
 }
 
+// ── Express payment grace-period revert ───────────────────────────────────────
+export async function runExpressPaymentRevert(): Promise<void> {
+  const graceDays = parseInt(process.env.EXPRESS_PAYMENT_GRACE_DAYS || '0');
+  if (graceDays <= 0) return;
+
+  const cutoff = new Date(Date.now() - graceDays * 24 * 60 * 60 * 1000).toISOString();
+
+  const unpaid = db.prepare(`
+    SELECT a.*, u.email as user_email, u.full_name as user_name
+    FROM applications a JOIN users u ON a.user_id = u.id
+    WHERE a.processing_tier = 'express'
+      AND (a.payment_status IS NULL OR a.payment_status != 'paid')
+      AND a.status = 'pending'
+      AND a.submitted_at < ?
+  `).all(cutoff) as any[];
+
+  if (unpaid.length === 0) return;
+
+  const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
+
+  for (const app of unpaid) {
+    db.prepare(`
+      UPDATE applications SET processing_tier = 'standard', tier_price = 0, payment_status = NULL WHERE id = ?
+    `).run(app.id);
+
+    db.prepare(`
+      INSERT INTO application_history (id, application_id, status, admin_notes, changed_by, changed_by_name)
+      VALUES (?, ?, 'pending', ?, 'system', 'System (Auto-Revert)')
+    `).run(
+      uuidv4(), app.id,
+      `Auto-reverted from Express to Standard — express fee not received within ${graceDays} day(s).`
+    );
+
+    notifyUser(
+      app.user_id,
+      `Your application ${app.application_number} has been automatically moved to Standard processing — the express fee was not received within ${graceDays} day(s). No extra action needed.`,
+      'info', app.id,
+    );
+
+    const html = `<!DOCTYPE html><html><body style="font-family:sans-serif;background:#f0f4ff;padding:32px;">
+      <div style="max-width:520px;margin:0 auto;background:#fff;border-radius:16px;overflow:hidden;border:1px solid #e5e7eb;">
+        <div style="background:linear-gradient(135deg,#0f1b3a,#1a2744);padding:24px 28px;">
+          <h1 style="color:#fff;margin:0;font-size:20px;">Processing Tier Update</h1>
+          <p style="color:#93c5fd;margin:4px 0 0;font-size:12px;text-transform:uppercase;letter-spacing:1px;">Application Notice</p>
+        </div>
+        <div style="padding:28px;">
+          <p style="color:#374151;">Dear <strong>${app.user_name}</strong>,</p>
+          <p style="color:#6b7280;">Your application <strong style="color:#1a2744;font-family:monospace;">${app.application_number}</strong> has been automatically moved from <strong>Express</strong> to <strong>Standard</strong> processing because the express fee was not received within ${graceDays} day(s).</p>
+          <div style="background:#d1fae5;border-left:4px solid #065f46;border-radius:0 8px 8px 0;padding:14px 16px;margin:20px 0;">
+            <p style="margin:0;color:#065f46;font-size:13px;font-weight:600;">✅ No extra fee is required. Your application will continue under Standard processing at no additional cost.</p>
+          </div>
+          <div style="text-align:center;margin-top:24px;">
+            <a href="${frontendUrl}/dashboard" style="display:inline-block;background:linear-gradient(135deg,#1a2744,#243660);color:#fff;padding:13px 28px;border-radius:10px;text-decoration:none;font-size:14px;font-weight:700;">
+              View Application →
+            </a>
+          </div>
+        </div>
+      </div>
+    </body></html>`;
+
+    sendEmail(
+      app.user_email,
+      `Your application has been moved to Standard processing — ${app.application_number}`,
+      html,
+    ).catch(console.error);
+
+    console.log(`[Express Revert] ${app.application_number} auto-reverted to Standard (unpaid >${graceDays}d).`);
+  }
+}
+
 // ── Scheduled Announcement delivery ───────────────────────────────────────────
 export async function runAnnouncementDelivery(): Promise<void> {
   const due = db.prepare(`
@@ -269,12 +339,14 @@ export function startAutoExpireJob(): void {
 
   runSlaCheck();
   runAnnouncementDelivery();
+  runExpressPaymentRevert();
 
   setInterval(() => {
     runAutoExpire();
     runExpiryReminders();
     runDataRetention();
     runSlaCheck();
+    runExpressPaymentRevert();
   }, 60 * 60 * 1000); // every hour
 
   // Announcements checked every 5 minutes for timely delivery

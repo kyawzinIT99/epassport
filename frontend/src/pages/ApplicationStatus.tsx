@@ -237,6 +237,10 @@ export default function ApplicationStatus() {
   const [uploadError, setUploadError] = useState('');
   const [uploadSuccess, setUploadSuccess] = useState(false);
 
+  // Tier downgrade state
+  const [downgradingTier, setDowngradingTier] = useState(false);
+  const [downgradeError, setDowngradeError] = useState('');
+
   const loadData = async () => {
     const [appRes, histRes, msgRes] = await Promise.all([
       api.get(`/applications/${id}`),
@@ -431,6 +435,20 @@ export default function ApplicationStatus() {
       setUploadError(err.response?.data?.message || 'Upload failed');
     } finally {
       setUploadLoading(false);
+    }
+  };
+
+  const handleDowngrade = async () => {
+    if (!application) return;
+    setDowngradingTier(true);
+    setDowngradeError('');
+    try {
+      const { data } = await api.patch(`/applications/${application.id}/downgrade-tier`);
+      setApplication(data);
+    } catch (err: any) {
+      setDowngradeError(err.response?.data?.message || 'Could not switch tier. Please try again.');
+    } finally {
+      setDowngradingTier(false);
     }
   };
 
@@ -669,6 +687,25 @@ export default function ApplicationStatus() {
                 <p>2. Quote your application number: <span className="font-mono font-bold bg-amber-100 px-1.5 py-0.5 rounded">{application.application_number}</span></p>
                 <p>3. Pay $50 by cash or card — staff will confirm your payment immediately.</p>
               </div>
+              {application.status === 'pending' && (
+                <div className="mt-4 pt-4 border-t border-amber-200">
+                  <p className="text-xs text-amber-700 mb-3">Not able to pay the express fee? You can switch back to Standard processing at no cost.</p>
+                  {downgradeError && (
+                    <p className="text-xs text-red-600 mb-2 font-medium">{downgradeError}</p>
+                  )}
+                  <button
+                    onClick={handleDowngrade}
+                    disabled={downgradingTier}
+                    className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl border-2 border-amber-300 text-amber-800 bg-white hover:bg-amber-50 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {downgradingTier ? (
+                      <><span className="animate-spin">⏳</span> Switching…</>
+                    ) : (
+                      <>📋 Switch to Standard Processing (Free)</>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           )
         )}

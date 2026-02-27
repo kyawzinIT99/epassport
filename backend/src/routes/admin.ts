@@ -724,6 +724,58 @@ router.patch('/applications/:id/internal-notes', authenticate, requireAdmin, (re
   res.json({ success: true });
 });
 
+// ── Admin tier override (standard ↔ express) ─────────────────────────────────
+router.patch('/applications/:id/tier', authenticate, requireAdmin, (req: AuthRequest, res: Response): void => {
+  const { tier } = req.body;
+  if (!['standard', 'express'].includes(tier)) {
+    res.status(400).json({ message: 'Tier must be standard or express' }); return;
+  }
+
+  const app = db.prepare('SELECT * FROM applications WHERE id = ?').get(req.params.id) as any;
+  if (!app) { res.status(404).json({ message: 'Not found' }); return; }
+  if (!['pending', 'processing'].includes(app.status)) {
+    res.status(400).json({ message: 'Tier can only be changed on pending or processing applications' }); return;
+  }
+  if (app.processing_tier === tier) {
+    res.status(400).json({ message: `Application is already on ${tier} tier` }); return;
+  }
+  if (app.payment_status === 'paid' && tier === 'standard') {
+    res.status(400).json({ message: 'Cannot downgrade to standard after payment has been recorded' }); return;
+  }
+
+  const tierPrice     = tier === 'express' ? 50 : 0;
+  const paymentStatus = tier === 'express' ? 'pending' : null;
+  db.prepare(`
+    UPDATE applications SET processing_tier = ?, tier_price = ?, payment_status = ? WHERE id = ?
+  `).run(tier, tierPrice, paymentStatus, app.id);
+
+  const admin     = db.prepare('SELECT full_name FROM users WHERE id = ?').get(req.user!.id) as any;
+  const adminName = admin?.full_name || req.user!.email;
+  const tierLabel = tier === 'express' ? 'Express' : 'Standard';
+  const histNotes = tier === 'standard'
+    ? 'Admin changed processing tier to Standard (express fee waived)'
+    : 'Admin upgraded processing tier to Express ($50 fee required)';
+
+  db.prepare(`
+    INSERT INTO application_history (id, application_id, status, admin_notes, changed_by, changed_by_name)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(uuidv4(), app.id, app.status, histNotes, req.user!.id, adminName);
+
+  notifyUser(
+    app.user_id,
+    tier === 'standard'
+      ? `Your application ${app.application_number} has been moved to Standard processing — the $50 express fee has been waived.`
+      : `Your application ${app.application_number} has been upgraded to Express processing — a $50 fee is now required.`,
+    'info', app.id,
+  );
+
+  logAudit(req.user!.id, adminName, `set_tier_${tier}`, 'application', app.id,
+    `Changed tier to ${tierLabel} for ${app.application_number}`);
+
+  const updated = db.prepare('SELECT * FROM applications WHERE id = ?').get(app.id);
+  res.json(updated);
+});
+
 // ── Scheduled Announcements ───────────────────────────────────────────────────
 router.get('/announcements', authenticate, requireAdmin, (_req: AuthRequest, res: Response): void => {
   const list = db.prepare('SELECT * FROM announcements ORDER BY scheduled_at DESC').all();

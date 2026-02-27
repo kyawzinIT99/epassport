@@ -1155,48 +1155,101 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Processing tier + Payment */}
-                    {(selected as any).processing_tier === 'express' && (
-                      <div className="mt-4 rounded-xl border overflow-hidden"
-                        style={{ borderColor: (selected as any).payment_status === 'paid' ? '#6ee7b7' : '#fbbf24' }}>
-                        {/* Header row */}
-                        <div className="flex items-center gap-2 px-3 py-2.5"
-                          style={{ background: (selected as any).payment_status === 'paid'
+                    <div className="mt-4 rounded-xl border overflow-hidden"
+                      style={{ borderColor: (selected as any).processing_tier === 'express'
+                        ? ((selected as any).payment_status === 'paid' ? '#6ee7b7' : '#fbbf24')
+                        : '#e5e7eb' }}>
+                      {/* Header row */}
+                      <div className="flex items-center gap-2 px-3 py-2.5"
+                        style={{ background: (selected as any).processing_tier === 'express'
+                          ? ((selected as any).payment_status === 'paid'
                             ? 'linear-gradient(135deg, #ecfdf5, #d1fae5)'
-                            : 'linear-gradient(135deg, #fffbeb, #fef3c7)' }}>
+                            : 'linear-gradient(135deg, #fffbeb, #fef3c7)')
+                          : 'linear-gradient(135deg, #f8faff, #f0f4ff)' }}>
+                        {(selected as any).processing_tier === 'express' ? (
                           <span className="font-bold text-xs" style={{ color: '#c9a227' }}>⚡ EXPRESS TIER</span>
-                          <span className="text-xs font-bold ml-auto">
-                            {(selected as any).payment_status === 'paid' ? (
+                        ) : (
+                          <span className="font-bold text-xs text-gray-600">📋 STANDARD TIER</span>
+                        )}
+                        <span className="text-xs font-bold ml-auto">
+                          {(selected as any).processing_tier === 'express' ? (
+                            (selected as any).payment_status === 'paid' ? (
                               <span className="text-emerald-700">✅ Paid · $50</span>
                             ) : (
                               <span className="text-amber-700 animate-pulse">💳 Payment Pending · $50</span>
-                            )}
-                          </span>
-                        </div>
-                        {/* Admin action: mark payment received */}
-                        {(selected as any).payment_status !== 'paid' && (
-                          <div className="px-3 py-2.5 bg-white border-t border-amber-100">
-                            <p className="text-xs text-gray-500 mb-2">
-                              Payment not yet recorded. Mark as received once cash is collected.
-                            </p>
-                            <button
-                              onClick={async () => {
-                                try {
-                                  const { data } = await api.patch(`/admin/applications/${selected!.id}/mark-payment`);
-                                  setApplications((prev) => prev.map((a) => a.id === data.id ? { ...a, ...data } : a));
-                                  setSelected((prev) => prev ? { ...prev, ...data } : prev);
-                                } catch (err: any) {
-                                  alert(err.response?.data?.message || 'Could not update payment');
-                                }
-                              }}
-                              className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-white transition hover:opacity-90"
-                              style={{ background: 'linear-gradient(135deg, #d97706, #f59e0b)' }}
-                            >
-                              ✅ Mark Payment as Received
-                            </button>
-                          </div>
-                        )}
+                            )
+                          ) : (
+                            <span className="text-gray-500">No fee</span>
+                          )}
+                        </span>
                       </div>
-                    )}
+                      {/* Admin action: mark payment received */}
+                      {(selected as any).processing_tier === 'express' && (selected as any).payment_status !== 'paid' && (
+                        <div className="px-3 py-2.5 bg-white border-t border-amber-100">
+                          <p className="text-xs text-gray-500 mb-2">
+                            Payment not yet recorded. Mark as received once cash is collected.
+                          </p>
+                          <button
+                            onClick={async () => {
+                              try {
+                                const { data } = await api.patch(`/admin/applications/${selected!.id}/mark-payment`);
+                                setApplications((prev) => prev.map((a) => a.id === data.id ? { ...a, ...data } : a));
+                                setSelected((prev) => prev ? { ...prev, ...data } : prev);
+                              } catch (err: any) {
+                                alert(err.response?.data?.message || 'Could not update payment');
+                              }
+                            }}
+                            className="w-full flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-bold text-white transition hover:opacity-90"
+                            style={{ background: 'linear-gradient(135deg, #d97706, #f59e0b)' }}
+                          >
+                            ✅ Mark Payment as Received
+                          </button>
+                        </div>
+                      )}
+                      {/* Admin tier override */}
+                      {['pending', 'processing'].includes(selected!.status) && (
+                        <div className="px-3 py-2.5 bg-white border-t border-gray-100">
+                          <p className="text-xs text-gray-400 mb-2">Override processing tier</p>
+                          <div className="flex gap-2">
+                            {(selected as any).processing_tier !== 'express' && (
+                              <button
+                                onClick={async () => {
+                                  if (!confirm('Upgrade to Express ($50 fee will be set to pending)?')) return;
+                                  try {
+                                    const { data } = await api.patch(`/admin/applications/${selected!.id}/tier`, { tier: 'express' });
+                                    setApplications((prev) => prev.map((a) => a.id === data.id ? { ...a, ...data } : a));
+                                    setSelected((prev) => prev ? { ...prev, ...data } : prev);
+                                  } catch (err: any) {
+                                    alert(err.response?.data?.message || 'Could not change tier');
+                                  }
+                                }}
+                                className="flex-1 py-1.5 rounded-lg text-xs font-bold border-2 transition hover:opacity-90"
+                                style={{ borderColor: '#c9a227', color: '#92400e', background: '#fffbeb' }}
+                              >
+                                ⚡ Upgrade to Express
+                              </button>
+                            )}
+                            {(selected as any).processing_tier !== 'standard' && (
+                              <button
+                                onClick={async () => {
+                                  if (!confirm('Downgrade to Standard? The express fee will be removed.')) return;
+                                  try {
+                                    const { data } = await api.patch(`/admin/applications/${selected!.id}/tier`, { tier: 'standard' });
+                                    setApplications((prev) => prev.map((a) => a.id === data.id ? { ...a, ...data } : a));
+                                    setSelected((prev) => prev ? { ...prev, ...data } : prev);
+                                  } catch (err: any) {
+                                    alert(err.response?.data?.message || 'Could not change tier');
+                                  }
+                                }}
+                                className="flex-1 py-1.5 rounded-lg text-xs font-bold border-2 border-gray-300 text-gray-600 bg-white transition hover:bg-gray-50"
+                              >
+                                📋 Switch to Standard
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
                     {/* Agent badge */}
                     {(selected as any).agent_name && (
