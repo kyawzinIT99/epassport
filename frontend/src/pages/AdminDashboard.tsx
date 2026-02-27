@@ -46,7 +46,7 @@ const statusConfig: Record<string, { bg: string; text: string; badge: string; ic
 };
 
 export default function AdminDashboard() {
-  const [tab, setTab] = useState<'applications' | 'users' | 'analytics' | 'audit'>('applications');
+  const [tab, setTab] = useState<'applications' | 'users' | 'analytics' | 'audit' | 'appointments'>('applications');
   const [applications, setApplications] = useState<Application[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [stats, setStats] = useState<AdminStats | null>(null);
@@ -136,6 +136,20 @@ export default function AdminDashboard() {
   const [isSuperAdmin, setIsSuperAdmin] = useState(storedUser.is_super_admin === 1);
   // Live new-application badge
   const [newAppsCount, setNewAppsCount] = useState(0);
+
+  // Appointments
+  const [adminAppointments, setAdminAppointments] = useState<any[]>([]);
+  const [arrangeAppt, setArrangeAppt] = useState<any | null>(null);
+  const [arrangeForm, setArrangeForm] = useState({ status: 'approved', scheduled_date: '', scheduled_time: '', location: '', admin_notes: '' });
+  const [arrangeLoading, setArrangeLoading] = useState(false);
+  const [arrangeError, setArrangeError] = useState('');
+  const [apptPendingCount, setApptPendingCount] = useState(0);
+
+  const fetchAdminAppointments = () =>
+    api.get('/appointments').then(({ data }) => {
+      setAdminAppointments(data);
+      setApptPendingCount(data.filter((a: any) => a.status === 'pending').length);
+    }).catch(() => {});
 
   const generateReport = async () => {
     setReportLoading(true);
@@ -260,6 +274,7 @@ export default function AdminDashboard() {
     if (tab === 'analytics') {
       api.get('/admin/csat').then(({ data }) => setCsatData(data)).catch(() => {});
     }
+    if (tab === 'appointments') fetchAdminAppointments();
   }, [tab]);
 
   // Live new-application badge: SSE → Navbar dispatches CustomEvent → we listen here
@@ -399,6 +414,7 @@ export default function AdminDashboard() {
     { key: 'users',        label: 'Users',        icon: '👥' },
     { key: 'analytics',    label: 'Analytics',    icon: '📊' },
     { key: 'audit',        label: 'Audit Log',    icon: '🔍' },
+    { key: 'appointments', label: 'Appointments', icon: '📅' },
   ] as const;
 
   return (
@@ -464,6 +480,11 @@ export default function AdminDashboard() {
                       style={tab === key ? { background: 'rgba(15,27,58,0.2)', color: '#0f1b3a' } : { background: 'rgba(255,255,255,0.15)', color: '#fff' }}
                     >
                       {users.length}
+                    </span>
+                  )}
+                  {key === 'appointments' && apptPendingCount > 0 && (
+                    <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-500 text-white font-bold animate-pulse">
+                      {apptPendingCount}
                     </span>
                   )}
                 </button>
@@ -1935,6 +1956,220 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+          </div>
+        )}
+
+        {/* ── Appointments Tab ─────────────────────────────────────────────── */}
+        {tab === 'appointments' && (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between px-1">
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                {adminAppointments.length} Appointment{adminAppointments.length !== 1 ? 's' : ''}
+                {apptPendingCount > 0 && (
+                  <span className="ml-2 text-amber-600">· {apptPendingCount} pending</span>
+                )}
+              </p>
+              <button
+                onClick={fetchAdminAppointments}
+                className="text-xs text-blue-500 hover:text-blue-700 font-medium transition"
+              >
+                ↻ Refresh
+              </button>
+            </div>
+
+            {adminAppointments.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-gray-100 shadow-card p-16 text-center">
+                <div className="text-5xl mb-3">📅</div>
+                <p className="font-semibold text-gray-700">No appointment requests yet</p>
+                <p className="text-sm text-gray-400 mt-1">Requests from applicants will appear here</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {adminAppointments.map((appt) => {
+                  type ApptStatus = 'pending' | 'approved' | 'rejected' | 'completed';
+                  const statusColor: Record<ApptStatus, { bar: string; badge: string }> = {
+                    pending:   { bar: 'linear-gradient(180deg,#fbbf24,#f59e0b)', badge: 'bg-amber-50 border-amber-200 text-amber-700' },
+                    approved:  { bar: 'linear-gradient(180deg,#34d399,#10b981)', badge: 'bg-emerald-50 border-emerald-200 text-emerald-700' },
+                    rejected:  { bar: 'linear-gradient(180deg,#f87171,#ef4444)', badge: 'bg-red-50 border-red-200 text-red-700' },
+                    completed: { bar: 'linear-gradient(180deg,#94a3b8,#64748b)', badge: 'bg-gray-50 border-gray-200 text-gray-600' },
+                  };
+                  const sc = statusColor[appt.status as ApptStatus] ?? statusColor.pending;
+
+                  return (
+                    <div key={appt.id} className="bg-white rounded-2xl shadow-card border border-gray-100 overflow-hidden flex">
+                      <div className="w-1.5 flex-shrink-0 rounded-l-2xl" style={{ background: sc.bar }} />
+                      <div className="flex-1 p-5">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <p className="font-bold text-gray-800">{appt.subject}</p>
+                              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${sc.badge}`}>
+                                {appt.status.charAt(0).toUpperCase() + appt.status.slice(1)}
+                              </span>
+                            </div>
+                            <p className="text-sm font-medium text-blue-700">{appt.user_name}</p>
+                            <p className="text-xs text-gray-400">{appt.user_email}</p>
+                            {appt.description && (
+                              <p className="text-sm text-gray-600 mt-1.5 line-clamp-2">{appt.description}</p>
+                            )}
+                            {appt.status === 'approved' && appt.scheduled_date && (
+                              <div className="mt-2 flex flex-wrap gap-2">
+                                <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                                  📅 {appt.scheduled_date}{appt.scheduled_time ? ` · ${appt.scheduled_time}` : ''}
+                                </span>
+                                {appt.location && (
+                                  <span className="text-xs font-semibold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg">
+                                    📍 {appt.location}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {appt.admin_notes && (
+                              <p className="text-xs text-gray-500 mt-1 italic">Note: {appt.admin_notes}</p>
+                            )}
+                            <p className="text-xs text-gray-400 mt-1.5">
+                              Requested {new Date(appt.requested_at).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                              {appt.arranged_by_name && ` · Arranged by ${appt.arranged_by_name}`}
+                            </p>
+                          </div>
+                          <div className="flex flex-col gap-2 flex-shrink-0">
+                            {appt.status !== 'completed' && appt.status !== 'rejected' && (
+                              <button
+                                onClick={() => {
+                                  setArrangeAppt(appt);
+                                  setArrangeForm({
+                                    status: appt.status === 'approved' ? 'approved' : 'approved',
+                                    scheduled_date: appt.scheduled_date || '',
+                                    scheduled_time: appt.scheduled_time || '',
+                                    location: appt.location || '',
+                                    admin_notes: appt.admin_notes || '',
+                                  });
+                                  setArrangeError('');
+                                }}
+                                className="text-xs px-3 py-1.5 rounded-xl font-semibold text-white transition hover:shadow-md"
+                                style={{ background: 'linear-gradient(135deg, #1a2744, #243660)' }}
+                              >
+                                {appt.status === 'pending' ? 'Arrange' : 'Edit'}
+                              </button>
+                            )}
+                            {appt.status === 'approved' && (
+                              <button
+                                onClick={async () => {
+                                  await api.patch(`/appointments/${appt.id}`, { ...appt, status: 'completed' });
+                                  fetchAdminAppointments();
+                                }}
+                                className="text-xs px-3 py-1.5 rounded-xl font-semibold bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition"
+                              >
+                                Done
+                              </button>
+                            )}
+                            {appt.status === 'pending' && (
+                              <button
+                                onClick={async () => {
+                                  if (!confirm('Reject this appointment request?')) return;
+                                  await api.patch(`/appointments/${appt.id}`, { status: 'rejected', admin_notes: '' });
+                                  fetchAdminAppointments();
+                                }}
+                                className="text-xs px-3 py-1.5 rounded-xl font-semibold bg-red-100 text-red-700 hover:bg-red-200 transition"
+                              >
+                                Reject
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Arrange Modal */}
+            {arrangeAppt && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
+                  <div className="px-6 py-5" style={{ background: 'linear-gradient(135deg, #0f1b3a, #1a2744)' }}>
+                    <h2 className="text-white font-bold text-lg">📅 Arrange Appointment</h2>
+                    <p className="text-blue-300 text-xs mt-0.5">{arrangeAppt.user_name} — {arrangeAppt.subject}</p>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    {arrangeError && (
+                      <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-2.5 text-sm">{arrangeError}</div>
+                    )}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Date <span className="text-red-500">*</span></label>
+                        <input
+                          type="date"
+                          value={arrangeForm.scheduled_date}
+                          onChange={(e) => setArrangeForm((f) => ({ ...f, scheduled_date: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Time</label>
+                        <input
+                          type="time"
+                          value={arrangeForm.scheduled_time}
+                          onChange={(e) => setArrangeForm((f) => ({ ...f, scheduled_time: e.target.value }))}
+                          className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Location / Branch</label>
+                      <input
+                        type="text"
+                        value={arrangeForm.location}
+                        onChange={(e) => setArrangeForm((f) => ({ ...f, location: e.target.value }))}
+                        placeholder="e.g. Main Passport Office, Counter 3"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-600 mb-1">Notes to Applicant</label>
+                      <textarea
+                        rows={2}
+                        value={arrangeForm.admin_notes}
+                        onChange={(e) => setArrangeForm((f) => ({ ...f, admin_notes: e.target.value }))}
+                        placeholder="Any instructions, documents to bring, etc."
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition"
+                      />
+                    </div>
+                    <div className="flex gap-3 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setArrangeAppt(null)}
+                        className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-50 transition"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        disabled={arrangeLoading || !arrangeForm.scheduled_date}
+                        onClick={async () => {
+                          if (!arrangeForm.scheduled_date) { setArrangeError('Date is required.'); return; }
+                          setArrangeLoading(true);
+                          setArrangeError('');
+                          try {
+                            await api.patch(`/appointments/${arrangeAppt.id}`, { ...arrangeForm });
+                            setArrangeAppt(null);
+                            fetchAdminAppointments();
+                          } catch (err: any) {
+                            setArrangeError(err.response?.data?.message || 'Failed to save');
+                          } finally {
+                            setArrangeLoading(false);
+                          }
+                        }}
+                        className="flex-1 text-white py-2.5 rounded-xl font-semibold text-sm transition disabled:opacity-60"
+                        style={{ background: 'linear-gradient(135deg, #c9a227, #f0c84a)', color: '#0f1b3a' }}
+                      >
+                        {arrangeLoading ? 'Saving…' : 'Confirm Appointment'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

@@ -233,4 +233,26 @@ db.exec(`
   );
 `);
 
+// ── Appointment scheduling ────────────────────────────────────────────────────
+db.exec(`
+  CREATE TABLE IF NOT EXISTS appointments (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    application_id TEXT,
+    subject TEXT NOT NULL,
+    description TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    requested_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    scheduled_date TEXT,
+    scheduled_time TEXT,
+    location TEXT,
+    admin_notes TEXT,
+    arranged_by TEXT,
+    arranged_by_name TEXT,
+    arranged_at DATETIME,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    FOREIGN KEY (application_id) REFERENCES applications(id)
+  );
+`);
+
 export default db;

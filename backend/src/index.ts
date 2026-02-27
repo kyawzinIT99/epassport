@@ -10,6 +10,7 @@ import authRoutes from './routes/auth';
 import applicationRoutes from './routes/applications';
 import adminRoutes from './routes/admin';
 import { notificationRouter } from './routes/notifications';
+import appointmentRoutes from './routes/appointments';
 import { startAutoExpireJob } from './services/autoExpire';
 
 const app = express();
@@ -57,6 +58,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/notifications', notificationRouter);
+app.use('/api/appointments', appointmentRoutes);
 
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', message: 'E-Passport API is running' });

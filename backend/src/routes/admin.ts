@@ -395,6 +395,7 @@ router.delete('/users/:id', authenticate, requireAdmin, (req: AuthRequest, res: 
       `Deleted user ${target.full_name} (${target.email})`);
 
     // Delete in dependency order so FK references don't block
+    db.prepare('DELETE FROM appointments WHERE user_id = ?').run(req.params.id);
     db.prepare('DELETE FROM messages WHERE application_id IN (SELECT id FROM applications WHERE user_id = ?)').run(req.params.id);
     db.prepare('DELETE FROM messages WHERE sender_id = ?').run(req.params.id);
     db.prepare('DELETE FROM csat_surveys WHERE application_id IN (SELECT id FROM applications WHERE user_id = ?)').run(req.params.id);
