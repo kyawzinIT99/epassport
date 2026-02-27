@@ -680,4 +680,48 @@ router.get('/report', authenticate, requireAdmin, (req: AuthRequest, res: Respon
   });
 });
 
+// ── Bulk broadcast message ─────────────────────────────────────────────────────
+router.post('/bulk-message', authenticate, requireAdmin, (req: AuthRequest, res: Response): void => {
+  const { message, filter_status, filter_tier } = req.body;
+  if (!message?.trim()) {
+    res.status(400).json({ message: 'Message is required.' });
+    return;
+  }
+
+  let query = 'SELECT id, application_number, user_id FROM applications WHERE 1=1';
+  const params: any[] = [];
+  if (filter_status && filter_status !== 'all') { query += ' AND status = ?';           params.push(filter_status); }
+  if (filter_tier   && filter_tier   !== 'all') { query += ' AND processing_tier = ?';  params.push(filter_tier); }
+
+  const apps = db.prepare(query).all(...params) as any[];
+  if (apps.length === 0) { res.json({ sent: 0 }); return; }
+
+  const adminName = getAdminName(req.user!.id);
+  let sent = 0;
+  for (const app of apps) {
+    db.prepare(`
+      INSERT INTO messages (id, application_id, sender_id, sender_name, sender_role, content)
+      VALUES (?, ?, ?, ?, 'admin', ?)
+    `).run(uuidv4(), app.id, req.user!.id, adminName, message.trim());
+    notifyUser(app.user_id, `💬 New message on application ${app.application_number}`, 'info', app.id);
+    sent++;
+  }
+
+  logAudit(req.user!.id, adminName, 'bulk_message', 'applications', '',
+    `Broadcast to ${sent} application(s). Filter: status=${filter_status || 'all'}, tier=${filter_tier || 'all'}. Preview: "${message.trim().slice(0, 80)}"`);
+
+  res.json({ sent });
+});
+
+// ── Internal admin notes (private, not visible to applicant) ─────────────────
+router.patch('/applications/:id/internal-notes', authenticate, requireAdmin, (req: AuthRequest, res: Response): void => {
+  const app = db.prepare('SELECT id FROM applications WHERE id = ?').get(req.params.id) as any;
+  if (!app) { res.status(404).json({ message: 'Application not found' }); return; }
+
+  const { internal_notes } = req.body;
+  db.prepare('UPDATE applications SET internal_notes = ? WHERE id = ?')
+    .run(internal_notes?.trim() || null, req.params.id);
+  res.json({ success: true });
+});
+
 export default router;

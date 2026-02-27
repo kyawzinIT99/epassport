@@ -138,6 +138,27 @@ export default function AdminDashboard() {
   // Live new-application badge
   const [newAppsCount, setNewAppsCount] = useState(0);
 
+  // Broadcast message
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [broadcastMsg, setBroadcastMsg] = useState('');
+  const [broadcastFilterStatus, setBroadcastFilterStatus] = useState('all');
+  const [broadcastFilterTier, setBroadcastFilterTier] = useState('all');
+  const [broadcastLoading, setBroadcastLoading] = useState(false);
+  const [broadcastResult, setBroadcastResult] = useState<number | null>(null);
+
+  // Internal admin notes
+  const [internalNotes, setInternalNotes] = useState('');
+  const [internalNotesSaving, setInternalNotesSaving] = useState(false);
+
+  // SLA thresholds (must match backend .env)
+  const SLA_STANDARD_DAYS = 15;
+  const SLA_EXPRESS_DAYS = 3;
+  const isOverdue = (app: any) => {
+    if (!['pending', 'processing'].includes(app.status)) return false;
+    const slaDays = app.processing_tier === 'express' ? SLA_EXPRESS_DAYS : SLA_STANDARD_DAYS;
+    return (Date.now() - new Date(app.submitted_at).getTime()) / 86400000 > slaDays;
+  };
+
   // Appointments
   const [adminAppointments, setAdminAppointments] = useState<any[]>([]);
   const [arrangeAppt, setArrangeAppt] = useState<any | null>(null);
@@ -609,9 +630,19 @@ export default function AdminDashboard() {
                   </button>
                 )}
                 <button
+                  onClick={() => { setBroadcastOpen(true); setBroadcastResult(null); }}
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition"
+                  title="Send broadcast message to applicants"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
+                  </svg>
+                  Broadcast
+                </button>
+                <button
                   onClick={exportCSV}
                   disabled={filtered.length === 0}
-                  className="ml-auto flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition disabled:opacity-40"
+                  className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition disabled:opacity-40"
                   title="Download filtered list as CSV"
                 >
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -684,7 +715,7 @@ export default function AdminDashboard() {
                           // Use local data immediately for instant response, then fetch fresh full data
                           // This ensures the review panel always shows complete information even when
                           // the application was added via SSE (which only contains partial fields)
-                          setSelected(app); setStatus(app.status ?? 'pending'); setNotes(app.admin_notes || '');
+                          setSelected(app); setStatus(app.status ?? 'pending'); setNotes(app.admin_notes || ''); setInternalNotes((app as any).internal_notes || '');
                           api.get(`/applications/${app.id}`).then(({ data }) => {
                             setSelected((prev) => prev?.id === data.id ? data : prev);
                             setStatus((prev) => prev === (app.status ?? 'pending') ? data.status : prev);
@@ -749,6 +780,11 @@ export default function AdminDashboard() {
                               <span className="text-xs text-gray-400 animate-pulse">AI scanning...</span>
                             )}
                             <p className="text-xs text-gray-400">{new Date(app.submitted_at).toLocaleDateString()}</p>
+                            {isOverdue(app) && (
+                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700 border border-red-200">
+                                ⚠️ Overdue
+                              </span>
+                            )}
                           </div>
                         </div>
                       </button>
@@ -1051,6 +1087,36 @@ export default function AdminDashboard() {
                           {panelMsgSending ? '...' : 'Send'}
                         </button>
                       </div>
+                    </div>
+
+                    {/* Internal Admin Notes (private — not visible to applicant) */}
+                    <div className="mt-5">
+                      <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                        🔒 Internal Notes
+                        <span className="text-gray-300 font-normal normal-case text-[10px]">admin only</span>
+                      </p>
+                      <textarea
+                        rows={3}
+                        value={internalNotes}
+                        onChange={(e) => setInternalNotes(e.target.value)}
+                        placeholder="Private notes for admins only — not visible to applicant..."
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-xs resize-none focus:outline-none focus:border-yellow-400 focus:ring-1 focus:ring-yellow-100 transition"
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!selected) return;
+                          setInternalNotesSaving(true);
+                          try {
+                            await api.patch(`/admin/applications/${selected.id}/internal-notes`, { internal_notes: internalNotes });
+                          } catch { /* silent */ } finally {
+                            setInternalNotesSaving(false);
+                          }
+                        }}
+                        disabled={internalNotesSaving}
+                        className="mt-1.5 w-full text-xs font-semibold py-2 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 transition disabled:opacity-50"
+                      >
+                        {internalNotesSaving ? 'Saving…' : 'Save Note'}
+                      </button>
                     </div>
 
                     {/* Processing tier + Payment */}
@@ -2348,6 +2414,94 @@ export default function AdminDashboard() {
                 className="text-sm font-semibold text-gray-500 hover:text-gray-800 transition">
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Broadcast Message Modal ───────────────────────────────────────── */}
+      {broadcastOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-slide-up">
+            <div className="px-6 py-5" style={{ background: 'linear-gradient(135deg, #0f1b3a, #1a2744)' }}>
+              <h2 className="text-white font-bold text-lg">📢 Broadcast Message</h2>
+              <p className="text-blue-300 text-xs mt-0.5">Send a message to multiple applicants at once</p>
+            </div>
+            <div className="p-6 space-y-4">
+              {broadcastResult !== null && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-xl px-4 py-3 text-sm font-semibold text-center">
+                  ✅ Sent to {broadcastResult} application{broadcastResult !== 1 ? 's' : ''}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Filter by Status</label>
+                  <select
+                    value={broadcastFilterStatus}
+                    onChange={(e) => setBroadcastFilterStatus(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 transition"
+                  >
+                    <option value="all">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-600 mb-1.5">Filter by Tier</label>
+                  <select
+                    value={broadcastFilterTier}
+                    onChange={(e) => setBroadcastFilterTier(e.target.value)}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 transition"
+                  >
+                    <option value="all">All Tiers</option>
+                    <option value="standard">Standard</option>
+                    <option value="express">Express</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-gray-600 mb-1.5">Message</label>
+                <textarea
+                  rows={4}
+                  value={broadcastMsg}
+                  onChange={(e) => setBroadcastMsg(e.target.value)}
+                  placeholder="Type your message to applicants..."
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm resize-none focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition"
+                />
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  type="button"
+                  onClick={() => { setBroadcastOpen(false); setBroadcastMsg(''); setBroadcastFilterStatus('all'); setBroadcastFilterTier('all'); setBroadcastResult(null); }}
+                  className="flex-1 border border-gray-200 text-gray-600 py-2.5 rounded-xl font-semibold text-sm hover:bg-gray-50 transition"
+                >
+                  Close
+                </button>
+                <button
+                  disabled={broadcastLoading || !broadcastMsg.trim()}
+                  onClick={async () => {
+                    if (!broadcastMsg.trim()) return;
+                    setBroadcastLoading(true);
+                    try {
+                      const { data } = await api.post('/admin/bulk-message', {
+                        message: broadcastMsg,
+                        filter_status: broadcastFilterStatus,
+                        filter_tier: broadcastFilterTier,
+                      });
+                      setBroadcastResult(data.sent);
+                      setBroadcastMsg('');
+                    } catch { /* silent */ } finally {
+                      setBroadcastLoading(false);
+                    }
+                  }}
+                  className="flex-1 text-white py-2.5 rounded-xl font-semibold text-sm transition disabled:opacity-60"
+                  style={{ background: 'linear-gradient(135deg, #1a2744, #243660)', color: 'white' }}
+                >
+                  {broadcastLoading ? 'Sending…' : 'Send Broadcast'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

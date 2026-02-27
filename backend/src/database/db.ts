@@ -255,4 +255,11 @@ db.exec(`
   );
 `);
 
+// ── Step 43: SLA tracking + Internal admin notes ──────────────────────────────
+const appCols6 = (db.prepare("PRAGMA table_info(applications)").all() as any[]).map((c) => c.name);
+if (!appCols6.includes('internal_notes'))
+  db.exec("ALTER TABLE applications ADD COLUMN internal_notes TEXT");
+if (!appCols6.includes('sla_notified_at'))
+  db.exec("ALTER TABLE applications ADD COLUMN sla_notified_at DATETIME");
+
 export default db;

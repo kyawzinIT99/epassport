@@ -165,6 +165,38 @@ export async function runDataRetention(): Promise<void> {
   console.log(`[Data Retention] Deleted ${toDelete.length} rejected application(s) older than ${retentionDays} days.`);
 }
 
+// ── SLA breach checker ────────────────────────────────────────────────────────
+export async function runSlaCheck(): Promise<void> {
+  const standardDays = parseInt(process.env.SLA_STANDARD_DAYS || '15');
+  const expressDays  = parseInt(process.env.SLA_EXPRESS_DAYS  || '3');
+
+  for (const [tier, slaDays] of [['standard', standardDays], ['express', expressDays]] as [string, number][]) {
+    const overdue = db.prepare(`
+      SELECT id, application_number, full_name, assigned_to, processing_tier
+      FROM applications
+      WHERE status IN ('pending', 'processing')
+        AND processing_tier = ?
+        AND sla_notified_at IS NULL
+        AND julianday('now') - julianday(submitted_at) > ?
+    `).all(tier, slaDays) as any[];
+
+    for (const app of overdue) {
+      const tierLabel = tier === 'express' ? 'Express' : 'Standard';
+      const msg = `⚠️ SLA Breach: ${app.application_number} (${app.full_name}) exceeded the ${slaDays}-day ${tierLabel} processing target.`;
+
+      if (app.assigned_to) {
+        notifyUser(app.assigned_to, msg, 'error', app.id);
+      } else {
+        const admins = db.prepare("SELECT id FROM users WHERE role = 'admin' AND suspended = 0").all() as any[];
+        for (const admin of admins) notifyUser(admin.id, msg, 'error', app.id);
+      }
+
+      db.prepare("UPDATE applications SET sla_notified_at = CURRENT_TIMESTAMP WHERE id = ?").run(app.id);
+      console.log(`[SLA Check] Breach: ${app.application_number} (${tierLabel} >${slaDays}d)`);
+    }
+  }
+}
+
 export function startAutoExpireJob(): void {
   const expireDays = parseInt(process.env.AUTO_EXPIRE_DAYS || '30');
   if (expireDays <= 0) {
@@ -183,9 +215,12 @@ export function startAutoExpireJob(): void {
     console.log('[Data Retention] Disabled (DATA_RETENTION_DAYS=0).');
   }
 
+  runSlaCheck();
+
   setInterval(() => {
     runAutoExpire();
     runExpiryReminders();
     runDataRetention();
+    runSlaCheck();
   }, 60 * 60 * 1000); // every hour
 }
