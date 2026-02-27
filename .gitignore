@@ -1,0 +1,14 @@
+node_modules/
+dist/
+*.db
+.env
+uploads/*
+!uploads/.gitkeep
+backend/src/uploads/*
+!backend/src/uploads/.gitkeep
+.DS_Store
+# GCP / cloud credentials — never commit
+*.json
+!package.json
+!package-lock.json
+!tsconfig*.json
