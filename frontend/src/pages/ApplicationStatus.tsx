@@ -223,6 +223,17 @@ export default function ApplicationStatus() {
     existing_passport_number: '',
   });
 
+  // Queue position state
+  const [queuePos, setQueuePos] = useState<{ position: number | null; total: number | null; tier: string } | null>(null);
+
+  // Document re-upload state
+  const [showDocUpload, setShowDocUpload] = useState(false);
+  const [uploadPhoto, setUploadPhoto] = useState<File | null>(null);
+  const [uploadIdDoc, setUploadIdDoc] = useState<File | null>(null);
+  const [uploadLoading, setUploadLoading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+
   const loadData = async () => {
     const [appRes, histRes, msgRes] = await Promise.all([
       api.get(`/applications/${id}`),
@@ -242,6 +253,14 @@ export default function ApplicationStatus() {
     // Auto-open support chat if ?chat=1
     if (searchParams.get('chat') === '1') {
       setSupportChatOpen(true);
+    }
+    // Fetch queue position for active applications
+    if (['pending', 'processing'].includes(appRes.data.status)) {
+      api.get(`/applications/${id}/queue-position`)
+        .then(({ data }) => setQueuePos(data))
+        .catch(() => {});
+    } else {
+      setQueuePos(null);
     }
   };
 
@@ -381,6 +400,30 @@ export default function ApplicationStatus() {
     }
   };
 
+  const handleDocUpload = async () => {
+    if (!uploadPhoto && !uploadIdDoc) return;
+    setUploadLoading(true);
+    setUploadError('');
+    try {
+      const fd = new FormData();
+      if (uploadPhoto) fd.append('photo', uploadPhoto);
+      if (uploadIdDoc) fd.append('id_document', uploadIdDoc);
+      const { data } = await api.patch(`/applications/${id}/documents`, fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      setApplication(data);
+      setShowDocUpload(false);
+      setUploadPhoto(null);
+      setUploadIdDoc(null);
+      setUploadSuccess(true);
+      setTimeout(() => setUploadSuccess(false), 4000);
+    } catch (err: any) {
+      setUploadError(err.response?.data?.message || 'Upload failed');
+    } finally {
+      setUploadLoading(false);
+    }
+  };
+
   const handleCsatSubmit = async () => {
     if (!csatRating) return;
     setCsatLoading(true);
@@ -494,6 +537,60 @@ export default function ApplicationStatus() {
           </div>
         </div>
 
+        {/* Queue position — shown for pending/processing */}
+        {queuePos && queuePos.position != null && (
+          <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-5 mb-6 no-print">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
+                  style={{ background: 'linear-gradient(135deg, #1a2744, #243660)' }}
+                >
+                  🔢
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">Queue Position</p>
+                  <p className="font-bold text-gray-800">
+                    <span className="text-2xl" style={{ color: '#1a2744' }}>#{queuePos.position}</span>
+                    <span className="text-gray-400 text-sm ml-1.5">of {queuePos.total} in queue</span>
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${
+                  queuePos.tier === 'express'
+                    ? 'bg-amber-50 text-amber-700 border-amber-200'
+                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                }`}>
+                  {queuePos.tier === 'express' ? '⚡ Express' : '📋 Standard'} track
+                </span>
+                <p className="text-xs text-gray-400 mt-1">
+                  Est. {queuePos.tier === 'express' ? '1–3' : '10–15'} days
+                </p>
+              </div>
+            </div>
+            {(queuePos.total ?? 0) > 1 && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between text-xs text-gray-400 mb-1.5">
+                  <span>Your place in the processing queue</span>
+                  <span>{queuePos.position} of {queuePos.total} remaining</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-1000"
+                    style={{
+                      width: `${Math.max(4, ((queuePos.total! - queuePos.position! + 1) / queuePos.total!) * 100)}%`,
+                      background: queuePos.tier === 'express'
+                        ? 'linear-gradient(90deg, #c9a227, #f0c84a)'
+                        : 'linear-gradient(90deg, #1a2744, #243660)',
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Digital passport certificate — only when approved */}
         {application.status === 'approved' && application.passport_number && (
           <PassportCertificate application={application} />
@@ -575,6 +672,30 @@ export default function ApplicationStatus() {
             <div className="border-l-4 border-yellow-400 pl-4 py-1 bg-amber-50 rounded-r-xl">
               <p className="text-gray-700 text-sm leading-relaxed">{application.admin_notes}</p>
             </div>
+          </div>
+        )}
+
+        {/* Update documents — only for pending applications */}
+        {application.status === 'pending' && (
+          <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-5 mb-6 no-print">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-semibold text-gray-800">📎 Update Documents</p>
+                <p className="text-xs text-gray-400 mt-0.5">Replace your photo or ID document while still in review</p>
+              </div>
+              <button
+                onClick={() => { setShowDocUpload(true); setUploadError(''); setUploadPhoto(null); setUploadIdDoc(null); }}
+                className="text-sm font-semibold px-4 py-2 rounded-xl text-white flex-shrink-0 transition hover:opacity-90"
+                style={{ background: 'linear-gradient(135deg, #1a2744, #243660)' }}
+              >
+                Upload New Files
+              </button>
+            </div>
+            {uploadSuccess && (
+              <div className="mt-3 px-3 py-2 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-700 text-sm font-medium flex items-center gap-2">
+                ✅ Documents updated — admin will review the new files.
+              </div>
+            )}
           </div>
         )}
 
@@ -1117,6 +1238,77 @@ export default function ApplicationStatus() {
           </div>
         </div>
       )}
+      {/* Document re-upload modal */}
+      {showDocUpload && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-slide-up">
+            <div className="px-6 py-5" style={{ background: 'linear-gradient(135deg, #0f1b3a, #1a2744)' }}>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-white">Update Documents</h2>
+                  <p className="text-blue-300 text-xs mt-0.5">Replace your passport photo or ID document</p>
+                </div>
+                <button onClick={() => setShowDocUpload(false)} className="text-blue-300 hover:text-white text-2xl leading-none transition">×</button>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              {uploadError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{uploadError}</div>
+              )}
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  Passport Photo <span className="text-gray-400 font-normal text-xs">(optional — replaces current)</span>
+                </label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png"
+                  onChange={(e) => setUploadPhoto(e.target.files?.[0] || null)}
+                  className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-passport-navy file:text-white hover:file:opacity-90 transition"
+                />
+                {uploadPhoto && <p className="text-xs text-blue-600 mt-1 font-medium">Selected: {uploadPhoto.name}</p>}
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                  ID Document <span className="text-gray-400 font-normal text-xs">(optional — replaces current)</span>
+                </label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,application/pdf"
+                  onChange={(e) => setUploadIdDoc(e.target.files?.[0] || null)}
+                  className="w-full text-sm text-gray-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-passport-navy file:text-white hover:file:opacity-90 transition"
+                />
+                {uploadIdDoc && <p className="text-xs text-blue-600 mt-1 font-medium">Selected: {uploadIdDoc.name}</p>}
+              </div>
+              <p className="text-xs text-gray-400">Leave a field blank to keep your existing file for that slot.</p>
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
+              <button
+                onClick={() => setShowDocUpload(false)}
+                className="flex-1 border border-gray-200 text-gray-700 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDocUpload}
+                disabled={uploadLoading || (!uploadPhoto && !uploadIdDoc)}
+                className="flex-1 text-white py-2.5 rounded-xl text-sm font-bold transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                style={{ background: 'linear-gradient(135deg, #1a2744, #243660)' }}
+              >
+                {uploadLoading ? (
+                  <>
+                    <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Uploading...
+                  </>
+                ) : '📎 Update Documents'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Footer />
     </div>
   );

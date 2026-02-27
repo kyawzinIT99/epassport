@@ -57,6 +57,8 @@ export default function Dashboard() {
   const user: User = userStr ? JSON.parse(userStr) : null;
 
   // Appointment state
+  const [queuePositions, setQueuePositions] = useState<Record<string, number>>({});
+
   const [appointments, setAppointments] = useState<any[]>([]);
   const [showApptModal, setShowApptModal] = useState(false);
   const [apptSubject, setApptSubject] = useState(APPT_SUBJECTS[0]);
@@ -72,6 +74,21 @@ export default function Dashboard() {
     api.get('/applications').then(({ data }) => {
       setApplications(data);
       setLoading(false);
+      // Fetch queue positions for active apps
+      const active: Application[] = data.filter((a: Application) => ['pending', 'processing'].includes(a.status));
+      Promise.all(
+        active.map((a) =>
+          api.get(`/applications/${a.id}/queue-position`)
+            .then(({ data: qd }) => ({ id: a.id, position: qd.position }))
+            .catch(() => null)
+        )
+      ).then((results) => {
+        const map: Record<string, number> = {};
+        for (const r of results) {
+          if (r && r.position != null) map[r.id] = r.position;
+        }
+        setQueuePositions(map);
+      });
     });
     fetchAppointments();
   }, []);
@@ -292,6 +309,13 @@ export default function Dashboard() {
                             <span className="text-sm">{cfg.icon}</span>
                             {cfg.label}
                           </span>
+                          {queuePositions[app.id] != null && (
+                            <span
+                              className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full border border-gray-200 bg-gray-50 text-gray-600"
+                            >
+                              🔢 Queue #{queuePositions[app.id]}
+                            </span>
+                          )}
                           {app.processing_tier === 'express' && (
                             <span
                               className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full"

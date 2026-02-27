@@ -431,4 +431,85 @@ router.post('/:id/csat', authenticate, (req: AuthRequest, res: Response): void =
   res.status(201).json({ message: 'Thank you for your feedback!' });
 });
 
+// ── Queue position ─────────────────────────────────────────────────────────────
+router.get('/:id/queue-position', authenticate, (req: AuthRequest, res: Response): void => {
+  const app = db.prepare(
+    'SELECT id, status, processing_tier, submitted_at, user_id, agent_id FROM applications WHERE id = ?'
+  ).get(req.params.id) as any;
+  if (!app) { res.status(404).json({ message: 'Not found' }); return; }
+  if (app.user_id !== req.user!.id && app.agent_id !== req.user!.id && req.user!.role !== 'admin') {
+    res.status(403).json({ message: 'Access denied' }); return;
+  }
+  if (!['pending', 'processing'].includes(app.status)) {
+    res.json({ position: null, total: null, tier: app.processing_tier });
+    return;
+  }
+  const ahead = (db.prepare(`
+    SELECT COUNT(*) as cnt FROM applications
+    WHERE status IN ('pending', 'processing')
+      AND processing_tier = ?
+      AND submitted_at < ?
+  `).get(app.processing_tier, app.submitted_at) as any).cnt;
+
+  const total = (db.prepare(`
+    SELECT COUNT(*) as cnt FROM applications
+    WHERE status IN ('pending', 'processing')
+      AND processing_tier = ?
+  `).get(app.processing_tier) as any).cnt;
+
+  res.json({ position: ahead + 1, total, tier: app.processing_tier });
+});
+
+// ── Document re-upload (pending apps only) ────────────────────────────────────
+router.patch(
+  '/:id/documents',
+  authenticate,
+  upload.fields([
+    { name: 'photo', maxCount: 1 },
+    { name: 'id_document', maxCount: 1 },
+  ]),
+  (req: AuthRequest, res: Response): void => {
+    const app = db.prepare('SELECT * FROM applications WHERE id = ?').get(req.params.id) as any;
+    if (!app) { res.status(404).json({ message: 'Not found' }); return; }
+    if (app.user_id !== req.user!.id) { res.status(403).json({ message: 'Access denied' }); return; }
+    if (app.status !== 'pending') {
+      res.status(400).json({ message: 'Documents can only be updated on pending applications' }); return;
+    }
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] };
+    if (!files?.photo?.[0] && !files?.id_document?.[0]) {
+      res.status(400).json({ message: 'Please upload at least one file' }); return;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const fs = require('fs');
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const path = require('path');
+    const uploadsDir = path.join(__dirname, '..', 'uploads');
+
+    if (files?.photo?.[0]) {
+      if (app.photo_path) {
+        try { fs.unlinkSync(path.join(uploadsDir, app.photo_path)); } catch { /* already gone */ }
+      }
+      db.prepare('UPDATE applications SET photo_path = ? WHERE id = ?').run(files.photo[0].filename, app.id);
+    }
+    if (files?.id_document?.[0]) {
+      if (app.id_document_path) {
+        try { fs.unlinkSync(path.join(uploadsDir, app.id_document_path)); } catch { /* already gone */ }
+      }
+      db.prepare('UPDATE applications SET id_document_path = ? WHERE id = ?').run(files.id_document[0].filename, app.id);
+    }
+
+    // Notify assigned admin or all admins
+    if (app.assigned_to) {
+      notifyUser(app.assigned_to, `Applicant updated documents for ${app.application_number}.`, 'info', app.id);
+    } else {
+      const admins = db.prepare("SELECT id FROM users WHERE role = 'admin' AND suspended = 0").all() as any[];
+      for (const admin of admins) notifyUser(admin.id, `Applicant updated documents for ${app.application_number}.`, 'info', app.id);
+    }
+
+    const updated = db.prepare('SELECT * FROM applications WHERE id = ?').get(app.id);
+    res.json(updated);
+  }
+);
+
 export default router;
