@@ -1,6 +1,7 @@
 import { useEffect, useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 import api from '../services/api';
 import { Application, User } from '../types';
 
@@ -496,6 +497,7 @@ export default function Dashboard() {
           </div>
         </div>
       )}
+      <Footer />
     </div>
   );
 }

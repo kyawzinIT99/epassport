@@ -1,6 +1,7 @@
 import { useState, FormEvent, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 import api from '../services/api';
 
 const DRAFT_KEY = 'apply_draft';
@@ -324,6 +325,7 @@ export default function Apply() {
           )}
         </form>
       </div>
+      <Footer />
     </div>
   );
 }

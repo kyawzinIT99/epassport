@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 import api from '../services/api';
 import { Application, AdminStats, AdminUser, User } from '../types';
 
@@ -2557,6 +2558,7 @@ export default function AdminDashboard() {
           </div>
         </div>
       )}
+      <Footer />
     </div>
   );
 }

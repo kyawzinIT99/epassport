@@ -2,6 +2,7 @@ import { useEffect, useState, useRef, FormEvent } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
 import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 import api from '../services/api';
 import { Application } from '../types';
 
@@ -1116,6 +1117,7 @@ export default function ApplicationStatus() {
           </div>
         </div>
       )}
+      <Footer />
     </div>
   );
 }

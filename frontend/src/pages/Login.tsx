@@ -1,5 +1,6 @@
 import { useState, FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import Footer from '../components/Footer';
 import api from '../services/api';
 
 export default function Login() {
@@ -43,7 +44,7 @@ export default function Login() {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      className="min-h-screen flex flex-col relative overflow-hidden"
       style={{ background: 'linear-gradient(135deg, #0f1b3a 0%, #1a2744 45%, #1e3a6e 75%, #0f2460 100%)' }}
     >
       {/* Animated background orbs */}
@@ -69,6 +70,7 @@ export default function Login() {
         }}
       />
 
+      <div className="flex-1 flex items-center justify-center p-4">
       <div className="relative z-10 w-full max-w-md animate-slide-up">
         {/* Logo area */}
         <div className="text-center mb-6">
@@ -208,6 +210,8 @@ export default function Login() {
 
         </div>
       </div>
+      </div>
+      <Footer />
     </div>
   );
 }
