@@ -541,7 +541,7 @@ export default function AdminDashboard() {
 
           {/* Stat cards */}
           {stats && (
-            <div className="grid grid-cols-7 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
               {statCards.map(({ label, value, icon, grad, sub }) => (
                 <div
                   key={label}
@@ -1813,7 +1813,7 @@ export default function AdminDashboard() {
             </div>
 
             {/* Key metric cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
               {[
                 { label: 'Total Applicants',    value: analytics.totalUsers, icon: '👥', grad: 'linear-gradient(135deg, #1a2744, #243660)' },
                 { label: 'Approved Passports',  value: analytics.statusDist.find((s) => s.status === 'approved')?.count ?? 0, icon: '✅', grad: 'linear-gradient(135deg, #065f46, #059669)' },
@@ -1998,7 +1998,7 @@ export default function AdminDashboard() {
                   <p className="text-xs text-gray-500 mt-0.5">Ratings submitted by applicants after their application is decided</p>
                 </div>
                 <div className="p-6">
-                  <div className="grid grid-cols-3 gap-4 mb-6">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                     <div className="text-center">
                       <p className="text-3xl font-bold" style={{ color: '#c9a227' }}>
                         {csatData.avg_rating ? `${csatData.avg_rating}/5` : '—'}
@@ -2856,7 +2856,7 @@ export default function AdminDashboard() {
 
             {/* Express / payment summary — shown only when express apps exist */}
             {(reportData.summary.expressCount ?? 0) > 0 && (
-              <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
                 {[
                   { label: 'Express Apps', value: reportData.summary.expressCount, color: '#d97706', icon: '⚡' },
                   { label: 'Total Revenue', value: `$${reportData.summary.totalRevenue ?? 0}`, color: '#059669', icon: '💰' },
@@ -2890,7 +2890,7 @@ export default function AdminDashboard() {
             {Object.keys(reportData.summary.byAgent || {}).length > 0 && (
               <div className="mb-8">
                 <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide mb-3">By Agent</h2>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                   {Object.entries(reportData.summary.byAgent as Record<string, number>).map(([agentName, count]) => (
                     <div key={agentName} className="flex items-center justify-between bg-indigo-50 border border-indigo-100 rounded-lg px-4 py-2.5 print:border-gray-300">
                       <div className="flex items-center gap-2">
@@ -2917,32 +2917,32 @@ export default function AdminDashboard() {
                   <thead>
                     <tr style={{ background: '#f8fafc' }} className="border-b border-gray-200">
                       {['App #', 'Applicant', 'Nationality', 'Type', 'Tier', 'Payment', 'Agent', 'Status', 'Submitted', 'Passport #', 'Expires'].map((h) => (
-                        <th key={h} className="px-4 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">{h}</th>
+                        <th key={h} className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap">{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {reportData.applications.map((app: any) => (
                       <tr key={app.id} className="hover:bg-gray-50 print:hover:bg-transparent">
-                        <td className="px-4 py-2.5 font-mono text-xs text-gray-700 whitespace-nowrap">{app.application_number}</td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 font-mono text-xs text-gray-700 whitespace-nowrap">{app.application_number}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                           <p className="font-medium text-gray-800 truncate max-w-[130px]">{app.full_name}</p>
                           <p className="text-xs text-gray-400 truncate max-w-[130px]">{app.email}</p>
                         </td>
-                        <td className="px-4 py-2.5 text-gray-600 whitespace-nowrap">{app.nationality}</td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 text-gray-600 whitespace-nowrap">{app.nationality}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                           <span className="text-xs capitalize bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-100 print:border-blue-200 whitespace-nowrap">
                             {app.passport_type}
                           </span>
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                           {app.processing_tier === 'express' ? (
                             <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-yellow-300 bg-amber-50 text-amber-700 whitespace-nowrap">⚡ Express</span>
                           ) : (
                             <span className="text-xs px-2 py-0.5 rounded-full border border-gray-200 bg-gray-50 text-gray-500 whitespace-nowrap">Standard</span>
                           )}
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                           {app.processing_tier === 'express' ? (
                             app.payment_status === 'paid' ? (
                               <span className="text-xs font-bold px-2 py-0.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 whitespace-nowrap">✅ Paid</span>
@@ -2953,14 +2953,14 @@ export default function AdminDashboard() {
                             <span className="text-xs text-gray-400">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                           {app.agent_name ? (
                             <span className="text-xs text-indigo-700 font-medium truncate max-w-[100px] block">👤 {app.agent_name}</span>
                           ) : (
                             <span className="text-xs text-gray-400">—</span>
                           )}
                         </td>
-                        <td className="px-4 py-2.5">
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5">
                           <span className={`text-xs font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
                             app.status === 'approved' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                             app.status === 'rejected' ? 'bg-red-50 text-red-600 border-red-200' :
@@ -2973,7 +2973,7 @@ export default function AdminDashboard() {
                         <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">
                           {app.submitted_at ? new Date(app.submitted_at.replace(' ', 'T') + 'Z').toLocaleDateString() : '—'}
                         </td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-gray-700 whitespace-nowrap">{app.passport_number || '—'}</td>
+                        <td className="px-2 sm:px-4 py-2 sm:py-2.5 font-mono text-xs text-gray-700 whitespace-nowrap">{app.passport_number || '—'}</td>
                         <td className="px-4 py-2.5 text-xs text-gray-500 whitespace-nowrap">{app.expires_at || '—'}</td>
                       </tr>
                     ))}

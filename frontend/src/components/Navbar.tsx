@@ -183,7 +183,7 @@ export default function Navbar() {
               </button>
 
               {showDropdown && (
-                <div className="absolute right-0 top-12 w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden animate-fade-in">
+                <div className="absolute right-0 top-12 w-[calc(100vw-1rem)] sm:w-80 bg-white rounded-2xl shadow-2xl border border-gray-100 z-50 overflow-hidden animate-fade-in">
                   <div
                     className="px-4 py-3 border-b border-gray-100 flex items-center justify-between"
                     style={{ background: 'linear-gradient(135deg, #0f1b3a, #1a2744)' }}

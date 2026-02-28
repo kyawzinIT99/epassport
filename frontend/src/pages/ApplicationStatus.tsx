@@ -862,7 +862,7 @@ export default function ApplicationStatus() {
         {/* Application details */}
         <div className="bg-white rounded-2xl shadow-card border border-gray-100 p-6">
           <h3 className="font-bold mb-5" style={{ color: '#1a2744' }}>Application Details</h3>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {details.map(([label, value]) => (
               <div key={label}>
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-0.5">{label}</p>
@@ -1069,7 +1069,7 @@ export default function ApplicationStatus() {
               return (
                 <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                   <div
-                    className={`max-w-[220px] rounded-2xl px-3 py-2 text-xs ${isMe ? 'text-white rounded-br-sm' : 'bg-gray-100 text-gray-800 rounded-bl-sm'}`}
+                    className={`max-w-[75%] sm:max-w-[220px] rounded-2xl px-3 py-2 text-xs ${isMe ? 'text-white rounded-br-sm' : 'bg-gray-100 text-gray-800 rounded-bl-sm'}`}
                     style={isMe ? { background: 'linear-gradient(135deg, #1a2744, #243660)' } : {}}
                   >
                     {!isMe && <p className="text-xs font-bold mb-0.5" style={{ color: '#c9a227' }}>{msg.sender_name}</p>}
@@ -1145,7 +1145,7 @@ export default function ApplicationStatus() {
                   <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 text-sm">{reapplyError}</div>
                 )}
                 {reapplyStep === 1 && (
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {([
                       { label: 'Full Name', key: 'full_name', colSpan: 2 },
                       { label: 'Date of Birth', key: 'date_of_birth', type: 'date' },
@@ -1173,8 +1173,8 @@ export default function ApplicationStatus() {
                   </div>
                 )}
                 {reapplyStep === 2 && (
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="col-span-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="col-span-1 sm:col-span-2">
                       <label className="block text-sm font-semibold text-gray-700 mb-1.5">Address</label>
                       <textarea value={reapplyForm.address} onChange={(e) => setReapplyForm({ ...reapplyForm, address: e.target.value })}
                         rows={3} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition resize-none" required />

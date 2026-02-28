@@ -159,8 +159,8 @@ export default function Apply() {
         <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 space-y-4">
           {step === 1 && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="col-span-1 sm:col-span-1 sm:col-span-2">
                   <label className={labelClass}>Full Name</label>
                   <input className={inputClass} value={form.full_name} onChange={(e) => update('full_name', e.target.value)} required />
                 </div>
@@ -194,8 +194,8 @@ export default function Apply() {
 
           {step === 2 && (
             <>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="col-span-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="col-span-1 sm:col-span-1 sm:col-span-2">
                   <label className={labelClass}>Address</label>
                   <textarea className={inputClass} rows={3} value={form.address} onChange={(e) => update('address', e.target.value)} required />
                 </div>
@@ -207,7 +207,7 @@ export default function Apply() {
                   <label className={labelClass}>Email Address</label>
                   <input type="email" className={inputClass} value={form.email} onChange={(e) => update('email', e.target.value)} required />
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className={labelClass}>Passport Type</label>
                   <select className={inputClass} value={form.passport_type} onChange={(e) => update('passport_type', e.target.value)}>
                     <option value="regular">Regular</option>
@@ -215,7 +215,7 @@ export default function Apply() {
                     <option value="diplomatic">Diplomatic</option>
                   </select>
                 </div>
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className={labelClass}>
                     Previous Passport Number <span className="text-red-500">*</span>
                   </label>
@@ -233,9 +233,9 @@ export default function Apply() {
                 </div>
 
                 {/* Processing Speed Selector */}
-                <div className="col-span-2">
+                <div className="col-span-1 sm:col-span-2">
                   <label className={labelClass}>Processing Speed</label>
-                  <div className="grid grid-cols-2 gap-3 mt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
                     <div
                       onClick={() => update('processing_tier', 'standard')}
                       className={`cursor-pointer rounded-xl border-2 p-4 transition ${

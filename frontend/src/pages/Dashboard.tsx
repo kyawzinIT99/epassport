@@ -195,7 +195,7 @@ export default function Dashboard() {
 
           {/* Quick stats */}
           {!loading && applications.length > 0 && (
-            <div className="grid grid-cols-3 gap-3 mt-6">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-6">
               {[
                 { label: 'Total', value: applications.length, color: 'rgba(255,255,255,0.1)', text: 'text-white', sub: 'text-blue-200' },
                 { label: 'Approved', value: approved, color: 'rgba(52,211,153,0.15)', text: 'text-emerald-300', sub: 'text-emerald-400' },

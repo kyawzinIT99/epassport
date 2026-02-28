@@ -45,7 +45,7 @@ export default function Register() {
               style={{ background: 'linear-gradient(135deg, #0f1b3a, #1a2744)' }}
             >
               <div
-                className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-4 shadow-gold"
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl flex items-center justify-center text-3xl sm:text-4xl mx-auto mb-4 shadow-gold"
                 style={{ background: 'linear-gradient(135deg, #c9a227, #f0c84a)' }}
               >
                 📧
@@ -104,25 +104,25 @@ export default function Register() {
         <div className="relative z-10 w-full max-w-md animate-slide-up">
           <div className="text-center mb-6">
             <div
-              className="w-20 h-20 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-4 shadow-gold"
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl flex items-center justify-center text-3xl sm:text-4xl mx-auto mb-4 shadow-gold"
               style={{ background: 'linear-gradient(135deg, #c9a227, #f0c84a)' }}
             >
               🛂
             </div>
-            <h1 className="text-3xl font-bold text-white tracking-tight">Create Account</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">Create Account</h1>
             <p className="text-blue-300 text-sm mt-1 font-medium tracking-wide">REGISTER FOR E-PASSPORT SERVICES</p>
           </div>
 
           <div className="bg-white rounded-3xl shadow-2xl overflow-hidden">
             <div
-              className="px-8 py-5 text-center"
+              className="px-5 sm:px-8 py-5 text-center"
               style={{ background: 'linear-gradient(135deg, #0f1b3a, #1a2744)' }}
             >
               <h2 className="text-lg font-semibold text-white">New Account</h2>
               <p className="text-blue-300 text-xs mt-0.5">Fill in your details below</p>
             </div>
 
-            <div className="px-8 py-6">
+            <div className="px-5 sm:px-8 py-6">
               {error && (
                 <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl p-3 mb-5 text-sm flex items-start gap-2">
                   <svg className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
