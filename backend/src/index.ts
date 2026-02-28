@@ -51,7 +51,8 @@ app.post('/api/auth/register', registerLimiter);
 app.post('/api/auth/forgot-password', forgotPasswordLimiter);
 
 // Serve uploaded files
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadsDir = process.env.UPLOADS_DIR || path.join(__dirname, 'uploads');
+app.use('/uploads', express.static(uploadsDir));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -96,6 +97,15 @@ app.get('/api/verify/:passport_number', (req, res) => {
     photo_path: record.photo_path,
   });
 });
+
+// Serve built React app in production (single-service deploy)
+if (process.env.NODE_ENV === 'production') {
+  const frontendDist = path.join(__dirname, 'public');
+  app.use(express.static(frontendDist));
+  app.get('*', (_req, res) => {
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`E-Passport Backend running on http://localhost:${PORT}`);
