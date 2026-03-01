@@ -1154,7 +1154,7 @@ export default function ApplicationStatus() {
                     ] as { label: string; key: string; colSpan?: number; type?: string; placeholder?: string }[]).map(({ label, key, type, colSpan, placeholder }) => (
                       <div key={key} className={colSpan ? 'col-span-2' : ''}>
                         <label className="block text-sm font-semibold text-gray-700 mb-1.5">{label}</label>
-                        <input type={type || 'text'} value={reapplyForm[key as keyof typeof reapplyForm]}
+                        <input type={type || 'text'} lang={type === 'date' ? 'en-GB' : undefined} value={reapplyForm[key as keyof typeof reapplyForm]}
                           onChange={(e) => setReapplyForm({ ...reapplyForm, [key]: e.target.value })}
                           placeholder={placeholder}
                           className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition" required />

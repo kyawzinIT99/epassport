@@ -1744,12 +1744,12 @@ export default function AdminDashboard() {
                 <div className="flex flex-wrap items-end gap-4">
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">From</label>
-                    <input type="date" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)}
+                    <input type="date" lang="en-GB" value={reportFrom} onChange={(e) => setReportFrom(e.target.value)}
                       className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition" />
                   </div>
                   <div>
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">To</label>
-                    <input type="date" value={reportTo} onChange={(e) => setReportTo(e.target.value)}
+                    <input type="date" lang="en-GB" value={reportTo} onChange={(e) => setReportTo(e.target.value)}
                       className="border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition" />
                   </div>
                   <div>
@@ -2256,6 +2256,7 @@ export default function AdminDashboard() {
                         <label className="block text-xs font-semibold text-gray-600 mb-1">Date <span className="text-red-500">*</span></label>
                         <input
                           type="date"
+                          lang="en-GB"
                           value={arrangeForm.scheduled_date}
                           onChange={(e) => setArrangeForm((f) => ({ ...f, scheduled_date: e.target.value }))}
                           className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-yellow-400 focus:ring-2 focus:ring-yellow-100 transition"

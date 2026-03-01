@@ -166,7 +166,7 @@ export default function Apply() {
                 </div>
                 <div>
                   <label className={labelClass}>Date of Birth</label>
-                  <input type="date" className={inputClass} value={form.date_of_birth} onChange={(e) => update('date_of_birth', e.target.value)} required />
+                  <input type="date" lang="en-GB" className={inputClass} value={form.date_of_birth} onChange={(e) => update('date_of_birth', e.target.value)} required />
                 </div>
                 <div>
                   <label className={labelClass}>Gender</label>
